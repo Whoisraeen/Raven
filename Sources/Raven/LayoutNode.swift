@@ -58,6 +58,13 @@ public class LayoutNode {
     public var scrollAxis: ScrollAxis? = nil
     public var scrollStateVar: StateVar<Float>? = nil
 
+    /// Accessibility properties
+    public var accessibilityRole: AccessibilityRole = .none
+    public var accessibilityLabel: String? = nil
+    public var accessibilityValue: String? = nil
+    public var accessibilityHint: String? = nil
+    public var isAccessibilityHidden: Bool = false
+
     /// Children
     public var children: [LayoutNode] = []
 
@@ -67,8 +74,8 @@ public class LayoutNode {
     public var intrinsicWidth: Float {
         if let fw = fixedWidth { return fw }
         if let text = text {
-            // Placeholder: estimate ~8px per character, min 20px
-            return max(Float(text.count) * 8.0, 20.0) + padding.leading + padding.trailing
+            let textSize = FontManager.shared.measureText(text, fontSize: 16.0)
+            return textSize.width + padding.leading + padding.trailing
         }
         switch stackAxis {
         case .horizontal:
@@ -93,8 +100,8 @@ public class LayoutNode {
     public var intrinsicHeight: Float {
         if let fh = fixedHeight { return fh }
         if let text = text {
-            // Placeholder: single-line text ~20px tall
-            return 20.0 + padding.top + padding.bottom
+            let textSize = FontManager.shared.measureText(text, fontSize: 16.0)
+            return textSize.height + padding.top + padding.bottom
         }
         switch stackAxis {
         case .horizontal:

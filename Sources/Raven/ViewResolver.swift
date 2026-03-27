@@ -103,6 +103,9 @@ public enum ViewResolver {
         node.foregroundColor = text.color ?? .text
         // Placeholder background to visualize text area
         node.backgroundColor = nil
+        
+        node.accessibilityRole = .text
+        node.accessibilityLabel = text.content
         return node
     }
 
@@ -113,9 +116,15 @@ public enum ViewResolver {
         node.padding = EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20)
         node.onTap = button.action  // Attach action for event dispatch
 
+        node.accessibilityRole = .button
+        node.accessibilityLabel = button.label
+
         let labelNode = LayoutNode()
         labelNode.text = button.label
         labelNode.foregroundColor = button.foregroundColor ?? .white
+        labelNode.accessibilityRole = .text
+        labelNode.accessibilityLabel = button.label
+        labelNode.isAccessibilityHidden = true // hide child label, parent button handles it
         node.children = [labelNode]
 
         return node
@@ -131,6 +140,7 @@ public enum ViewResolver {
         let node = LayoutNode()
         node.imageSource = imageView.source
         node.imageOpacity = imageView.opacity
+        node.accessibilityRole = .image
 
         // Use explicit size or defaults (natural size will be resolved at render time)
         if let w = imageView.displayWidth { node.fixedWidth = w }
@@ -148,6 +158,11 @@ public enum ViewResolver {
         node.isTextField = true
         node.textFieldBinding = textField.text
         node.textFieldPlaceholder = textField.placeholder
+        
+        node.accessibilityRole = .textField
+        node.accessibilityLabel = textField.placeholder
+        node.accessibilityValue = textField.text.wrappedValue
+
         node.textFieldId = ObjectIdentifier(node)
 
         // Show current text or placeholder

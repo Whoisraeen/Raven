@@ -211,6 +211,40 @@ public class FontManager: @unchecked Sendable {
         )
     }
 
+    /// Measure the width and height of a string at a given font size.
+    public func measureText(_ text: String, fontSize: Float) -> (width: Float, height: Float) {
+        let metrics = getMetrics(fontSize: fontSize)
+        let height = metrics.lineHeight
+
+        guard fontLoaded else {
+            // Fallback to monospace 8px-based approximation for the fallback font
+            return (width: Float(text.count) * (fontSize / 2.0), height: height)
+        }
+
+        var width: Float = 0
+        var prevCodepoint: UInt32 = 0
+
+        for char in text {
+            let cp = char.unicodeScalars.first.map { UInt32($0.value) } ?? 32
+            
+            if prevCodepoint != 0 {
+                width += getKerning(cp1: prevCodepoint, cp2: cp, fontSize: fontSize)
+            }
+            
+            // Just get advance, avoid generating SDF if not needed
+            let scale = stbtt_ScaleForPixelHeight(&fontInfo, fontSize)
+            let glyphIndex = stbtt_FindGlyphIndex(&fontInfo, Int32(cp))
+            var advanceWidth: Int32 = 0
+            var leftSideBearing: Int32 = 0
+            stbtt_GetGlyphHMetrics(&fontInfo, glyphIndex, &advanceWidth, &leftSideBearing)
+            width += Float(advanceWidth) * scale
+            
+            prevCodepoint = cp
+        }
+
+        return (width: width, height: height)
+    }
+
     // MARK: - Atlas Access
 
     /// Whether the atlas texture needs re-uploading.

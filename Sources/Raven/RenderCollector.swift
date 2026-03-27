@@ -42,17 +42,19 @@ public enum RenderCollector {
         // Draw text as actual text (not placeholder rects)
         if let text = node.text, !text.isEmpty {
             let fg = node.foregroundColor ?? .text
-            // Center text within the node
-            let charWidth = Float(FontAtlas.glyphWidth)
-            let charHeight = Float(FontAtlas.glyphHeight)
-            let textWidth = Float(text.count) * charWidth
-            let textX = node.x + max(0, (node.width - textWidth) / 2)
-            let textY = node.y + max(0, (node.height - charHeight) / 2)
+            // Center text within the node using exact measurement
+            let textSize = FontManager.shared.measureText(text, fontSize: 16.0)
+            let textWidth = textSize.width
+            let textHeight = textSize.height
+            
+            // TextRenderer expects x, y to be the top-left of the bounding box.
+            let textX = node.x + node.padding.leading + max(0, (node.width - node.padding.leading - node.padding.trailing - textWidth) / 2)
+            let textY = node.y + node.padding.top + max(0, (node.height - node.padding.top - node.padding.bottom - textHeight) / 2)
 
             output.textCommands.append(TextDrawCommand(
                 text: text,
                 x: textX, y: textY,
-                scale: 1.0,
+                scale: 1.0, // Scale 1.0 means 16.0 base size
                 r: fg.r, g: fg.g, b: fg.b, a: fg.a
             ))
         }

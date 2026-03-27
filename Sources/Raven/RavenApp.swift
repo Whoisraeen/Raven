@@ -158,6 +158,13 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                     // Store for hit testing
                     rootNode = resolved
 
+                    // Verify accessibility tree
+                    if let a11yTree = AccessibilityCollector.collect(root: resolved) {
+                        print("\n--- Accessibility Tree Rebuilt ---")
+                        print(a11yTree)
+                        print("----------------------------------\n")
+                    }
+
                     // Collect quads, text commands, and image commands
                     let renderOutput = RenderCollector.collect(from: resolved)
                     cachedQuads = renderOutput.quads

@@ -47,6 +47,36 @@ public struct CornerRadiusModifier: ViewModifier {
     }
 }
 
+// MARK: - Accessibility Modifiers
+
+public struct AccessibilityLabelModifier: ViewModifier {
+    public let label: String
+    public func apply(to node: LayoutNode) {
+        node.accessibilityLabel = label
+    }
+}
+
+public struct AccessibilityValueModifier: ViewModifier {
+    public let value: String
+    public func apply(to node: LayoutNode) {
+        node.accessibilityValue = value
+    }
+}
+
+public struct AccessibilityHiddenModifier: ViewModifier {
+    public let hidden: Bool
+    public func apply(to node: LayoutNode) {
+        node.isAccessibilityHidden = hidden
+    }
+}
+
+public struct AccessibilityRoleModifier: ViewModifier {
+    public let role: AccessibilityRole
+    public func apply(to node: LayoutNode) {
+        node.accessibilityRole = role
+    }
+}
+
 // MARK: - View Extension Methods
 
 extension View {
@@ -85,5 +115,23 @@ extension View {
     /// Set the corner radius.
     public func cornerRadius(_ radius: Float) -> ModifiedView<Self, CornerRadiusModifier> {
         ModifiedView(content: self, modifier: CornerRadiusModifier(radius: radius))
+    }
+    
+    // MARK: - Accessibility Extensions
+
+    public func accessibilityLabel(_ label: String) -> ModifiedView<Self, AccessibilityLabelModifier> {
+        ModifiedView(content: self, modifier: AccessibilityLabelModifier(label: label))
+    }
+
+    public func accessibilityValue(_ value: String) -> ModifiedView<Self, AccessibilityValueModifier> {
+        ModifiedView(content: self, modifier: AccessibilityValueModifier(value: value))
+    }
+
+    public func accessibilityHidden(_ hidden: Bool = true) -> ModifiedView<Self, AccessibilityHiddenModifier> {
+        ModifiedView(content: self, modifier: AccessibilityHiddenModifier(hidden: hidden))
+    }
+
+    public func accessibilityRole(_ role: AccessibilityRole) -> ModifiedView<Self, AccessibilityRoleModifier> {
+        ModifiedView(content: self, modifier: AccessibilityRoleModifier(role: role))
     }
 }
