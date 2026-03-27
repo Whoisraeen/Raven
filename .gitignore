@@ -1,0 +1,40 @@
+# ─── Swift / SPM ───
+.build/
+.swiftpm/
+Package.resolved
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS ───
+.DS_Store
+.DS_Store?
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# ─── Vendor archives ───
+vendor/*.zip
+vendor/*.tar.gz
+vendor/*.7z
+
+# ─── Compiled shaders (regenerated from source) ───
+*.spv
+
+# ─── Dev tooling ───
+.gemini/
+
+# ─── Temporary / build outputs ───
+*.o
+*.d
+*.exe
+*.pdb
+*.ilk

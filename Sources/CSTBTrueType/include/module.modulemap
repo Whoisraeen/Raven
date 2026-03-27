@@ -1,0 +1,4 @@
+module CSTBTrueType {
+    header "stb_truetype.h"
+    export *
+}

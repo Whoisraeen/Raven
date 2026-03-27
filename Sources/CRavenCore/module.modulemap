@@ -1,0 +1,4 @@
+module CRavenCore [system] {
+    header "include/raven_core.h"
+    export *
+}
