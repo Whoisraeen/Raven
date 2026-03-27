@@ -3,42 +3,14 @@
 /// Enables the declarative `{ ... }` syntax for building view trees.
 @resultBuilder
 public struct ViewBuilder {
-    // Single child
-    public static func buildBlock<C0: View>(_ c0: C0) -> C0 {
-        c0
+    // Empty block
+    public static func buildBlock() -> EmptyView {
+        EmptyView()
     }
 
-    // Two children
-    public static func buildBlock<C0: View, C1: View>(_ c0: C0, _ c1: C1) -> TupleView2<C0, C1> {
-        TupleView2(c0, c1)
-    }
-
-    // Three children
-    public static func buildBlock<C0: View, C1: View, C2: View>(
-        _ c0: C0, _ c1: C1, _ c2: C2
-    ) -> TupleView3<C0, C1, C2> {
-        TupleView3(c0, c1, c2)
-    }
-
-    // Four children
-    public static func buildBlock<C0: View, C1: View, C2: View, C3: View>(
-        _ c0: C0, _ c1: C1, _ c2: C2, _ c3: C3
-    ) -> TupleView4<C0, C1, C2, C3> {
-        TupleView4(c0, c1, c2, c3)
-    }
-
-    // Five children
-    public static func buildBlock<C0: View, C1: View, C2: View, C3: View, C4: View>(
-        _ c0: C0, _ c1: C1, _ c2: C2, _ c3: C3, _ c4: C4
-    ) -> TupleView5<C0, C1, C2, C3, C4> {
-        TupleView5(c0, c1, c2, c3, c4)
-    }
-
-    // Six children
-    public static func buildBlock<C0: View, C1: View, C2: View, C3: View, C4: View, C5: View>(
-        _ c0: C0, _ c1: C1, _ c2: C2, _ c3: C3, _ c4: C4, _ c5: C5
-    ) -> TupleView6<C0, C1, C2, C3, C4, C5> {
-        TupleView6(c0, c1, c2, c3, c4, c5)
+    // Variadic buildBlock using parameter packs
+    public static func buildBlock<each Content: View>(_ content: repeat each Content) -> TupleView<repeat each Content> {
+        TupleView(repeat each content)
     }
 
     // Optional (if without else)

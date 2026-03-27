@@ -19,9 +19,10 @@ public struct VStack: View {
         self.childViews = [content()]
     }
 
-    func resolvedChildren() -> [LayoutNode] {
-        childViews.flatMap { view -> [LayoutNode] in
-            let node = resolveAny(view)
+    func resolvedChildren(path: String) -> [LayoutNode] {
+        childViews.enumerated().flatMap { index, view -> [LayoutNode] in
+            let childPath = "\(path).v\(index)"
+            let node = resolveAny(view, path: childPath)
             // If the resolved node is a bare stack (from TupleView), unwrap its children
             if node.stackAxis == .vertical && node.backgroundColor == nil && node.text == nil {
                 return node.children
@@ -52,9 +53,10 @@ public struct HStack: View {
         self.childViews = [content()]
     }
 
-    func resolvedChildren() -> [LayoutNode] {
-        childViews.flatMap { view -> [LayoutNode] in
-            let node = resolveAny(view)
+    func resolvedChildren(path: String) -> [LayoutNode] {
+        childViews.enumerated().flatMap { index, view -> [LayoutNode] in
+            let childPath = "\(path).h\(index)"
+            let node = resolveAny(view, path: childPath)
             if node.stackAxis == .vertical && node.backgroundColor == nil && node.text == nil {
                 return node.children
             }
@@ -78,9 +80,10 @@ public struct ZStack: View {
         self.childViews = [content()]
     }
 
-    func resolvedChildren() -> [LayoutNode] {
-        childViews.flatMap { view -> [LayoutNode] in
-            let node = resolveAny(view)
+    func resolvedChildren(path: String) -> [LayoutNode] {
+        childViews.enumerated().flatMap { index, view -> [LayoutNode] in
+            let childPath = "\(path).z\(index)"
+            let node = resolveAny(view, path: childPath)
             if node.stackAxis == .vertical && node.backgroundColor == nil && node.text == nil {
                 return node.children
             }
@@ -92,9 +95,9 @@ public struct ZStack: View {
 // MARK: - Helper
 
 /// Type-erased view resolution helper
-func resolveAny(_ view: any View) -> LayoutNode {
+func resolveAny(_ view: any View, path: String) -> LayoutNode {
     func doResolve<V: View>(_ v: V) -> LayoutNode {
-        ViewResolver.resolve(v)
+        ViewResolver.resolve(v, path: path)
     }
     return doResolve(view)
 }

@@ -23,59 +23,23 @@ extension Never: View {
 
 // MARK: - TupleView (holds multiple child views)
 
-public struct TupleView2<C0: View, C1: View>: View {
-    public typealias Body = Never
-    public var body: Never { fatalError("TupleView2 has no body") }
-    public let c0: C0
-    public let c1: C1
-    public init(_ c0: C0, _ c1: C1) { self.c0 = c0; self.c1 = c1 }
+public protocol AnyTupleView {
+    var childrenViews: [any View] { get }
 }
 
-public struct TupleView3<C0: View, C1: View, C2: View>: View {
+public struct TupleView<each Content: View>: View, AnyTupleView {
     public typealias Body = Never
-    public var body: Never { fatalError("TupleView3 has no body") }
-    public let c0: C0
-    public let c1: C1
-    public let c2: C2
-    public init(_ c0: C0, _ c1: C1, _ c2: C2) { self.c0 = c0; self.c1 = c1; self.c2 = c2 }
-}
-
-public struct TupleView4<C0: View, C1: View, C2: View, C3: View>: View {
-    public typealias Body = Never
-    public var body: Never { fatalError("TupleView4 has no body") }
-    public let c0: C0
-    public let c1: C1
-    public let c2: C2
-    public let c3: C3
-    public init(_ c0: C0, _ c1: C1, _ c2: C2, _ c3: C3) {
-        self.c0 = c0; self.c1 = c1; self.c2 = c2; self.c3 = c3
-    }
-}
-
-public struct TupleView5<C0: View, C1: View, C2: View, C3: View, C4: View>: View {
-    public typealias Body = Never
-    public var body: Never { fatalError("TupleView5 has no body") }
-    public let c0: C0
-    public let c1: C1
-    public let c2: C2
-    public let c3: C3
-    public let c4: C4
-    public init(_ c0: C0, _ c1: C1, _ c2: C2, _ c3: C3, _ c4: C4) {
-        self.c0 = c0; self.c1 = c1; self.c2 = c2; self.c3 = c3; self.c4 = c4
-    }
-}
-
-public struct TupleView6<C0: View, C1: View, C2: View, C3: View, C4: View, C5: View>: View {
-    public typealias Body = Never
-    public var body: Never { fatalError("TupleView6 has no body") }
-    public let c0: C0
-    public let c1: C1
-    public let c2: C2
-    public let c3: C3
-    public let c4: C4
-    public let c5: C5
-    public init(_ c0: C0, _ c1: C1, _ c2: C2, _ c3: C3, _ c4: C4, _ c5: C5) {
-        self.c0 = c0; self.c1 = c1; self.c2 = c2; self.c3 = c3; self.c4 = c4; self.c5 = c5
+    public var body: Never { fatalError("TupleView has no body") }
+    
+    public let value: (repeat each Content)
+    public let childrenViews: [any View]
+    
+    public init(_ content: repeat each Content) {
+        self.value = (repeat each content)
+        
+        var views: [any View] = []
+        repeat views.append(each content)
+        self.childrenViews = views
     }
 }
 

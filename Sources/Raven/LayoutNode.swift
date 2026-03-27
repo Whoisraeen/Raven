@@ -5,12 +5,33 @@
 /// collector flattens the tree into drawable quads.
 public class LayoutNode {
     /// Absolute position (top-left corner)
-    public var x: Float = 0
-    public var y: Float = 0
+    public var x: Float = 0 {
+        didSet { if oldValue != x { animate(.x, from: oldValue, to: x) } }
+    }
+    public var y: Float = 0 {
+        didSet { if oldValue != y { animate(.y, from: oldValue, to: y) } }
+    }
 
     /// Resolved size
     public var width: Float = 0
     public var height: Float = 0
+
+    /// Visual properties
+    public var opacity: Float = 1.0 {
+        didSet { if oldValue != opacity { animate(.opacity, from: oldValue, to: opacity) } }
+    }
+    public var scale: Float = 1.0 {
+        didSet { if oldValue != scale { animate(.scale, from: oldValue, to: scale) } }
+    }
+    public var rotation: Float = 0.0 {
+        didSet { if oldValue != rotation { animate(.rotation, from: oldValue, to: rotation) } }
+    }
+
+    /// Stable identity for reconciliation/animation
+    public var id: AnyHashable? = nil
+
+    /// Static cache to persist positions across resolutions for animation
+    internal static var previousPositions: [AnyHashable: (x: Float, y: Float)] = [:]
 
     /// Visual properties
     public var backgroundColor: Color? = nil
@@ -121,6 +142,30 @@ public class LayoutNode {
             }
             return padding.top + padding.bottom
         }
+    // MARK: - Animation Support
+
+    private func animate(_ property: AnimatableProperty, from start: Float, to target: Float) {
+        guard let animation = AnimationEngine.shared.currentAnimation else { return }
+        
+        // If we have a stable ID, we can check if we should override the 'start' value
+        // with the value from the previous frame to ensure continuity.
+        var effectiveStart = start
+        if let id = self.id, let prev = LayoutNode.previousPositions[id] {
+            switch property {
+            case .x: effectiveStart = prev.x
+            case .y: effectiveStart = prev.y
+            default: break
+            }
+        }
+
+        let instance = AnimationInstance(
+            node: self,
+            property: property,
+            startValue: effectiveStart,
+            targetValue: target,
+            animation: animation
+        )
+        AnimationEngine.shared.addAnimation(instance)
     }
 }
 

@@ -39,5 +39,7 @@ vendor/*.7z
 *.pdb
 *.ilk
 build_output.txt
+build_log.txt
+*build_log*.txt
 *.log
 *.tmp

@@ -80,7 +80,16 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         // First frame always needs a full build
         var needsRebuild = true
 
+        var lastTicks = SDL_GetTicks()
+
         while isRunning {
+            let currentTicks = SDL_GetTicks()
+            let deltaTime = Double(currentTicks - lastTicks) / 1000.0
+            lastTicks = currentTicks
+
+            // Tick animation engine (interpolates values and notifies state tracker if changed)
+            AnimationEngine.shared.tick(deltaTime: deltaTime)
+
             while SDL_PollEvent(&event) {
                 switch event.type {
                 case quitEventType:
@@ -135,8 +144,14 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                 }
             }
 
-            // Check if any @State/@Published/StateVar changed
+            // Check if any @State/@Published/StateVar changed (or if AnimationEngine triggered a frame)
             if StateTracker.shared.checkAndClear() {
+                // Snapshot positions from the OLD tree to provide 'start' values for the NEW tree
+                LayoutNode.previousPositions.removeAll(keepingCapacity: true)
+                if let root = rootNode {
+                    snapshotPositions(node: root)
+                }
+
                 needsRebuild = true
             }
 
@@ -213,3 +228,16 @@ private func findScrollNode(x: Float, y: Float, in node: LayoutNode) -> LayoutNo
 
     return nil
 }
+
+// MARK: - Animation Support
+
+/// Recursively store node positions in the static cache.
+private func snapshotPositions(node: LayoutNode) {
+    if let id = node.id {
+        LayoutNode.previousPositions[id] = (node.x, node.y)
+    }
+    for child in node.children {
+        snapshotPositions(node: child)
+    }
+}
+

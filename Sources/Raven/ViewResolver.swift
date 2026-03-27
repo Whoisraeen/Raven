@@ -5,90 +5,108 @@
 public enum ViewResolver {
 
     /// Resolve any View into a LayoutNode tree.
-    public static func resolve<V: View>(_ view: V) -> LayoutNode {
+    public static func resolve<V: View>(_ view: V, path: String = "root") -> LayoutNode {
         // Check for primitive views first (the terminal nodes)
-        if let node = resolvePrimitive(view) {
+        if let node = resolvePrimitive(view, path: path) {
+            node.id = path
             return node
         }
 
         // For composite views, resolve the body
-        return resolve(view.body)
+        let node = resolve(view.body, path: path)
+        node.id = path
+        return node
     }
 
     /// Attempt to resolve a view as a primitive (known type).
-    /// Returns nil if the view is not a primitive and should
-    /// be resolved via its `body` property.
-    private static func resolvePrimitive<V: View>(_ view: V) -> LayoutNode? {
+    private static func resolvePrimitive<V: View>(_ view: V, path: String) -> LayoutNode? {
         // Never / EmptyView
-        if view is EmptyView {
-            return LayoutNode()
-        }
-        if view is Never {
-            return LayoutNode()
+        if view is EmptyView || view is Never {
+            let node = LayoutNode()
+            node.id = path
+            return node
         }
 
         // Text
         if let textView = view as? Text {
-            return resolveText(textView)
+            let node = resolveText(textView)
+            node.id = path
+            return node
         }
 
         // Button
         if let buttonView = view as? Button {
-            return resolveButton(buttonView)
+            let node = resolveButton(buttonView)
+            node.id = path
+            return node
         }
 
         // Image
         if let imageView = view as? Image {
-            return resolveImage(imageView)
+            let node = resolveImage(imageView)
+            node.id = path
+            return node
         }
 
         // Spacer
         if view is Spacer {
-            return resolveSpacer()
+            let node = resolveSpacer()
+            node.id = path
+            return node
         }
 
         // TextField
         if let textField = view as? TextField {
-            return resolveTextField(textField)
+            let node = resolveTextField(textField)
+            node.id = path
+            return node
         }
 
         // VStack
         if let vstack = view as? VStack {
-            return resolveVStack(vstack)
-        }
-
-        // ScrollView
-        if let scrollView = view as? ScrollView {
-            return resolveScrollView(scrollView)
+            let node = resolveVStack(vstack, path: path)
+            node.id = path
+            return node
         }
 
         // HStack
         if let hstack = view as? HStack {
-            return resolveHStack(hstack)
+            let node = resolveHStack(hstack, path: path)
+            node.id = path
+            return node
         }
 
         // ZStack
         if let zstack = view as? ZStack {
-            return resolveZStack(zstack)
+            let node = resolveZStack(zstack, path: path)
+            node.id = path
+            return node
         }
 
-        // TupleViews — extract children
-        if let resolved = resolveTupleView(view) {
+        // ScrollView
+        if let scrollView = view as? ScrollView {
+            let node = resolveScrollView(scrollView, path: path)
+            node.id = path
+            return node
+        }
+
+        // ModifiedView
+        if let resolved = resolveModifiedView(view, path: path) {
             return resolved
         }
 
-        // ModifiedView — resolve content and apply modifier
-        if let resolved = resolveModifiedView(view) {
+        // TupleViews
+        if let resolved = resolveTupleView(view, path: path) {
             return resolved
         }
 
         // OptionalView
-        if let resolved = resolveOptionalView(view) {
+        if let resolved = resolveOptionalView(view, path: path) {
             return resolved
         }
 
         // ConditionalView
-        if let resolved = resolveConditionalView(view) {
+        if let resolved = resolveConditionalView(view, path: path) {
             return resolved
         }
 
@@ -101,9 +119,7 @@ public enum ViewResolver {
         let node = LayoutNode()
         node.text = text.content
         node.foregroundColor = text.color ?? .text
-        // Placeholder background to visualize text area
         node.backgroundColor = nil
-        
         node.accessibilityRole = .text
         node.accessibilityLabel = text.content
         return node
@@ -113,20 +129,25 @@ public enum ViewResolver {
         let node = LayoutNode()
         node.backgroundColor = button.backgroundColor ?? .primary
         node.cornerRadius = 6
-        node.padding = EdgeInsets(top: 10, leading: 20, bottom: 10, trailing: 20)
-        node.onTap = button.action  // Attach action for event dispatch
-
+        node.onTap = button.action
+        
+        let textNode = LayoutNode()
+        textNode.text = button.title
+        textNode.foregroundColor = .buttonText
+        textNode.padding = EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+        
+        node.children = [textNode]
         node.accessibilityRole = .button
-        node.accessibilityLabel = button.label
+        node.accessibilityLabel = button.title
+        return node
+    }
 
-        let labelNode = LayoutNode()
-        labelNode.text = button.label
-        labelNode.foregroundColor = button.foregroundColor ?? .white
-        labelNode.accessibilityRole = .text
-        labelNode.accessibilityLabel = button.label
-        labelNode.isAccessibilityHidden = true // hide child label, parent button handles it
-        node.children = [labelNode]
-
+    private static func resolveImage(_ image: Image) -> LayoutNode {
+        let node = LayoutNode()
+        node.imageSource = image.path
+        node.imageOpacity = image.opacity
+        node.accessibilityRole = .image
+        node.accessibilityLabel = image.path
         return node
     }
 
@@ -136,66 +157,37 @@ public enum ViewResolver {
         return node
     }
 
-    private static func resolveImage(_ imageView: Image) -> LayoutNode {
-        let node = LayoutNode()
-        node.imageSource = imageView.source
-        node.imageOpacity = imageView.opacity
-        node.accessibilityRole = .image
-
-        // Use explicit size or defaults (natural size will be resolved at render time)
-        if let w = imageView.displayWidth { node.fixedWidth = w }
-        if let h = imageView.displayHeight { node.fixedHeight = h }
-
-        // Default size for images without explicit frame — 100x100 placeholder
-        if node.fixedWidth == nil { node.fixedWidth = 100 }
-        if node.fixedHeight == nil { node.fixedHeight = 100 }
-
-        return node
-    }
-
     private static func resolveTextField(_ textField: TextField) -> LayoutNode {
         let node = LayoutNode()
         node.isTextField = true
         node.textFieldBinding = textField.text
         node.textFieldPlaceholder = textField.placeholder
-        
-        node.accessibilityRole = .textField
-        node.accessibilityLabel = textField.placeholder
-        node.accessibilityValue = textField.text.wrappedValue
-
-        node.textFieldId = ObjectIdentifier(node)
-
-        // Show current text or placeholder
-        let currentText = textField.text.wrappedValue
-        node.text = currentText.isEmpty ? textField.placeholder : currentText
-
-        // Style defaults
-        node.backgroundColor = textField.backgroundColor ?? .surface
-        node.foregroundColor = textField.textColor ?? .text
+        node.textFieldId = textField.id
+        node.backgroundColor = .surface
         node.cornerRadius = 4
         node.padding = EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12)
-
-        // Default width for text fields
+        node.accessibilityRole = .textField
+        node.accessibilityValue = textField.text.value
+        
         if node.fixedWidth == nil { node.fixedWidth = 200 }
-
         return node
     }
 
     // MARK: - ScrollView
 
-    private static func resolveScrollView(_ scrollView: ScrollView) -> LayoutNode {
+    private static func resolveScrollView(_ scrollView: ScrollView, path: String) -> LayoutNode {
         let node = LayoutNode()
         node.isScrollView = true
         node.scrollAxis = scrollView.axis
         node.scrollOffset = scrollView.scrollOffset.value
         node.scrollStateVar = scrollView.scrollOffset
 
-        // Resolve children into a VStack-like container
         let contentNode = LayoutNode()
         contentNode.stackAxis = .vertical
         contentNode.spacing = 0
-        contentNode.children = scrollView.content.map { child in
-            resolveAnyView(child)
+        contentNode.id = "\(path).sv"
+        contentNode.children = scrollView.content.enumerated().map { index, child in
+            resolveAnyView(child, path: "\(path).s\(index)")
         }
 
         node.children = [contentNode]
@@ -203,61 +195,50 @@ public enum ViewResolver {
     }
 
     /// Resolve a type-erased View.
-    private static func resolveAnyView(_ view: any View) -> LayoutNode {
-        // Use the body to get a concrete type we can resolve
+    private static func resolveAnyView(_ view: any View, path: String) -> LayoutNode {
         func resolveImpl<V: View>(_ v: V) -> LayoutNode {
-            return ViewResolver.resolve(v)
+            return ViewResolver.resolve(v, path: path)
         }
         return resolveImpl(view)
     }
 
     // MARK: - Stacks
 
-    private static func resolveVStack(_ vstack: VStack) -> LayoutNode {
+    private static func resolveVStack(_ vstack: VStack, path: String) -> LayoutNode {
         let node = LayoutNode()
         node.stackAxis = .vertical
         node.spacing = vstack.spacing
         node.horizontalAlignment = vstack.alignment
-        node.children = vstack.resolvedChildren()
+        node.children = vstack.resolvedChildren(path: path)
         return node
     }
 
-    private static func resolveHStack(_ hstack: HStack) -> LayoutNode {
+    private static func resolveHStack(_ hstack: HStack, path: String) -> LayoutNode {
         let node = LayoutNode()
         node.stackAxis = .horizontal
         node.spacing = hstack.spacing
         node.verticalAlignment = hstack.alignment
-        node.children = hstack.resolvedChildren()
+        node.children = hstack.resolvedChildren(path: path)
         return node
     }
 
-    private static func resolveZStack(_ zstack: ZStack) -> LayoutNode {
+    private static func resolveZStack(_ zstack: ZStack, path: String) -> LayoutNode {
         let node = LayoutNode()
         node.stackAxis = .zStack
-        node.children = zstack.resolvedChildren()
+        node.children = zstack.resolvedChildren(path: path)
         return node
     }
 
     // MARK: - TupleViews
 
-    private static func resolveTupleView<V: View>(_ view: V) -> LayoutNode? {
+    private static func resolveTupleView<V: View>(_ view: V, path: String) -> LayoutNode? {
         var children: [LayoutNode] = []
+        if let tupleView = view as? AnyTupleView {
+            children = tupleView.childrenViews.enumerated().map { index, childView in
+                resolveAnyView(childView as! (any View), path: "\(path).\(index)")
+            }
+        } else { return nil }
 
-        if let tv2 = view as? AnyTupleView2 {
-            children = tv2.resolveChildren()
-        } else if let tv3 = view as? AnyTupleView3 {
-            children = tv3.resolveChildren()
-        } else if let tv4 = view as? AnyTupleView4 {
-            children = tv4.resolveChildren()
-        } else if let tv5 = view as? AnyTupleView5 {
-            children = tv5.resolveChildren()
-        } else if let tv6 = view as? AnyTupleView6 {
-            children = tv6.resolveChildren()
-        } else {
-            return nil
-        }
-
-        // A bare TupleView acts as a vertical stack with 0 spacing
         let node = LayoutNode()
         node.stackAxis = .vertical
         node.spacing = 0
@@ -267,95 +248,56 @@ public enum ViewResolver {
 
     // MARK: - ModifiedView
 
-    private static func resolveModifiedView<V: View>(_ view: V) -> LayoutNode? {
+    private static func resolveModifiedView<V: View>(_ view: V, path: String) -> LayoutNode? {
         guard let modified = view as? AnyModifiedView else { return nil }
-        return modified.resolveModified()
+        return modified.resolveModified(path: path)
     }
 
     // MARK: - Optional / Conditional
 
-    private static func resolveOptionalView<V: View>(_ view: V) -> LayoutNode? {
+    private static func resolveOptionalView<V: View>(_ view: V, path: String) -> LayoutNode? {
         guard let optional = view as? AnyOptionalView else { return nil }
-        return optional.resolveOptional()
+        return optional.resolveOptional(path: path)
     }
 
-    private static func resolveConditionalView<V: View>(_ view: V) -> LayoutNode? {
+    private static func resolveConditionalView<V: View>(_ view: V, path: String) -> LayoutNode? {
         guard let conditional = view as? AnyConditionalView else { return nil }
-        return conditional.resolveConditional()
+        return conditional.resolveConditional(path: path)
     }
 }
 
 // MARK: - Type Erasure Protocols for ViewResolver
 
-/// These protocols allow ViewResolver to inspect generic types
-/// without knowing their type parameters at compile time.
-
-protocol AnyTupleView2 { func resolveChildren() -> [LayoutNode] }
-protocol AnyTupleView3 { func resolveChildren() -> [LayoutNode] }
-protocol AnyTupleView4 { func resolveChildren() -> [LayoutNode] }
-protocol AnyTupleView5 { func resolveChildren() -> [LayoutNode] }
-protocol AnyTupleView6 { func resolveChildren() -> [LayoutNode] }
-protocol AnyModifiedView { func resolveModified() -> LayoutNode }
-protocol AnyOptionalView { func resolveOptional() -> LayoutNode }
-protocol AnyConditionalView { func resolveConditional() -> LayoutNode }
-
-extension TupleView2: AnyTupleView2 {
-    func resolveChildren() -> [LayoutNode] {
-        [ViewResolver.resolve(c0), ViewResolver.resolve(c1)]
-    }
-}
-
-extension TupleView3: AnyTupleView3 {
-    func resolveChildren() -> [LayoutNode] {
-        [ViewResolver.resolve(c0), ViewResolver.resolve(c1), ViewResolver.resolve(c2)]
-    }
-}
-
-extension TupleView4: AnyTupleView4 {
-    func resolveChildren() -> [LayoutNode] {
-        [ViewResolver.resolve(c0), ViewResolver.resolve(c1), ViewResolver.resolve(c2),
-         ViewResolver.resolve(c3)]
-    }
-}
-
-extension TupleView5: AnyTupleView5 {
-    func resolveChildren() -> [LayoutNode] {
-        [ViewResolver.resolve(c0), ViewResolver.resolve(c1), ViewResolver.resolve(c2),
-         ViewResolver.resolve(c3), ViewResolver.resolve(c4)]
-    }
-}
-
-extension TupleView6: AnyTupleView6 {
-    func resolveChildren() -> [LayoutNode] {
-        [ViewResolver.resolve(c0), ViewResolver.resolve(c1), ViewResolver.resolve(c2),
-         ViewResolver.resolve(c3), ViewResolver.resolve(c4), ViewResolver.resolve(c5)]
-    }
-}
+protocol AnyModifiedView { func resolveModified(path: String) -> LayoutNode }
+protocol AnyOptionalView { func resolveOptional(path: String) -> LayoutNode }
+protocol AnyConditionalView { func resolveConditional(path: String) -> LayoutNode }
 
 extension ModifiedView: AnyModifiedView {
-    func resolveModified() -> LayoutNode {
-        let node = ViewResolver.resolve(content)
+    func resolveModified(path: String) -> LayoutNode {
+        let node = ViewResolver.resolve(content, path: "\(path).m")
         modifier.apply(to: node)
         return node
     }
 }
 
 extension OptionalView: AnyOptionalView {
-    func resolveOptional() -> LayoutNode {
+    func resolveOptional(path: String) -> LayoutNode {
         if let content = content {
-            return ViewResolver.resolve(content)
+            return ViewResolver.resolve(content, path: "\(path).o")
         }
-        return LayoutNode()  // Empty node
+        let node = LayoutNode()
+        node.id = "\(path).o"
+        return node
     }
 }
 
 extension ConditionalView: AnyConditionalView {
-    func resolveConditional() -> LayoutNode {
+    func resolveConditional(path: String) -> LayoutNode {
         switch storage {
         case .trueContent(let view):
-            return ViewResolver.resolve(view)
+            return ViewResolver.resolve(view, path: "\(path).ct")
         case .falseContent(let view):
-            return ViewResolver.resolve(view)
+            return ViewResolver.resolve(view, path: "\(path).cf")
         }
     }
 }
