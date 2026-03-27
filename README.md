@@ -81,7 +81,7 @@ app.run()
 
 ```powershell
 # Clone
-git clone https://github.com/your-org/Raven.git
+git clone https://github.com/Whoisraeen/Raven.git
 cd Raven
 
 # Compile shaders (requires Vulkan SDK)
