@@ -38,3 +38,6 @@ vendor/*.7z
 *.exe
 *.pdb
 *.ilk
+build_output.txt
+*.log
+*.tmp
