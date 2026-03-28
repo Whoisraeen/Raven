@@ -1,5 +1,15 @@
 import CVulkan
 
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(ucrt)
+import ucrt
+#elseif canImport(Darwin)
+import Darwin
+#endif
+
 // MARK: - VulkanPipeline
 
 /// Holds the Vulkan graphics pipeline, render pass, and associated resources
@@ -9,8 +19,29 @@ final class VulkanPipeline {
     let renderPass: VkRenderPass
     let pipelineLayout: VkPipelineLayout
     let graphicsPipeline: VkPipeline
+    let pipelineCache: VkPipelineCache?
     private(set) var framebuffers: [VkFramebuffer?]
     private(set) var imageViews: [VkImageView?]
+
+    /// Path for persisting the pipeline cache to disk.
+    static let cacheFilePath: String = {
+        #if os(Windows)
+        if let appData = getenv("LOCALAPPDATA") {
+            return String(cString: appData) + "\\Raven\\pipeline_cache.bin"
+        }
+        return ".raven_pipeline_cache.bin"
+        #elseif os(macOS)
+        if let home = getenv("HOME") {
+            return String(cString: home) + "/Library/Caches/Raven/pipeline_cache.bin"
+        }
+        return ".raven_pipeline_cache.bin"
+        #else
+        if let home = getenv("HOME") {
+            return String(cString: home) + "/.cache/raven/pipeline_cache.bin"
+        }
+        return ".raven_pipeline_cache.bin"
+        #endif
+    }()
 
     init(
         device: VkDevice,
@@ -119,6 +150,37 @@ final class VulkanPipeline {
             fail("vkCreatePipelineLayout returned null")
         }
         self.pipelineLayout = pipelineLayout
+
+        // --- Pipeline Cache (load from disk if available) ---
+        var pipelineCacheHandle: VkPipelineCache?
+        let cacheData = VulkanPipeline.loadCacheFromDisk()
+        if let data = cacheData {
+            data.withUnsafeBytes { rawBuffer in
+                var cacheCreateInfo = VkPipelineCacheCreateInfo(
+                    sType: VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+                    pNext: nil,
+                    flags: 0,
+                    initialDataSize: rawBuffer.count,
+                    pInitialData: rawBuffer.baseAddress
+                )
+                let result = vkCreatePipelineCache(device, &cacheCreateInfo, nil, &pipelineCacheHandle)
+                if result != VK_SUCCESS {
+                    // Cache data may be stale/incompatible — create empty
+                    pipelineCacheHandle = nil
+                }
+            }
+        }
+        if pipelineCacheHandle == nil {
+            var cacheCreateInfo = VkPipelineCacheCreateInfo(
+                sType: VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+                pNext: nil,
+                flags: 0,
+                initialDataSize: 0,
+                pInitialData: nil
+            )
+            vkCreatePipelineCache(device, &cacheCreateInfo, nil, &pipelineCacheHandle)
+        }
+        self.pipelineCache = pipelineCacheHandle
 
         // --- Shader Modules ---
         let vertSPIRV = loadSPIRV(named: "quad_vert.spv")
@@ -306,7 +368,7 @@ final class VulkanPipeline {
 
                             vkCheck(
                                 vkCreateGraphicsPipelines(
-                                    device, nil, 1, &pipelineInfo, nil, &pipelineHandle
+                                    device, pipelineCacheHandle, 1, &pipelineInfo, nil, &pipelineHandle
                                 ),
                                 "vkCreateGraphicsPipelines"
                             )
@@ -406,9 +468,72 @@ final class VulkanPipeline {
         imageViews = []
     }
 
+    /// Save the pipeline cache to disk for faster startup next time.
+    func saveCacheToDisk() {
+        guard let cache = pipelineCache else { return }
+        var dataSize: Int = 0
+        let sizeResult = vkGetPipelineCacheData(device, cache, &dataSize, nil)
+        guard sizeResult == VK_SUCCESS, dataSize > 0 else { return }
+
+        var data = [UInt8](repeating: 0, count: dataSize)
+        let dataResult = data.withUnsafeMutableBytes { buffer in
+            vkGetPipelineCacheData(device, cache, &dataSize, buffer.baseAddress)
+        }
+        guard dataResult == VK_SUCCESS else { return }
+
+        let path = VulkanPipeline.cacheFilePath
+        // Ensure parent directory exists
+        let parentDir = parentDirectory(of: path)
+        #if os(Windows)
+        "cmd".withCString { cmd in
+            "/c mkdir \"\(parentDir)\" 2>NUL".withCString { args in
+                _ = system("cmd /c mkdir \"\(parentDir)\" 2>NUL")
+            }
+        }
+        #else
+        _ = system("mkdir -p '\(parentDir)' 2>/dev/null")
+        #endif
+
+        // Write cache data
+        let _ = data.withUnsafeBufferPointer { buffer in
+            path.withCString { pathPtr in
+                let file = fopen(pathPtr, "wb")
+                if let file = file {
+                    fwrite(buffer.baseAddress, 1, dataSize, file)
+                    fclose(file)
+                }
+            }
+        }
+    }
+
+    /// Load pipeline cache data from disk, or nil if not available.
+    static func loadCacheFromDisk() -> [UInt8]? {
+        let path = cacheFilePath
+        return path.withCString { pathPtr -> [UInt8]? in
+            guard let file = fopen(pathPtr, "rb") else { return nil }
+            defer { fclose(file) }
+
+            fseek(file, 0, SEEK_END)
+            let size = ftell(file)
+            guard size > 0 else { return nil }
+            fseek(file, 0, SEEK_SET)
+
+            var data = [UInt8](repeating: 0, count: size)
+            let read = data.withUnsafeMutableBufferPointer { buffer in
+                fread(buffer.baseAddress, 1, size, file)
+            }
+            guard read == size else { return nil }
+            return data
+        }
+    }
+
     func destroy() {
+        saveCacheToDisk()
         destroyFramebuffers()
         vkDestroyPipeline(device, graphicsPipeline, nil)
+        if let cache = pipelineCache {
+            vkDestroyPipelineCache(device, cache, nil)
+        }
         vkDestroyPipelineLayout(device, pipelineLayout, nil)
         vkDestroyRenderPass(device, renderPass, nil)
     }

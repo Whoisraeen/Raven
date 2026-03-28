@@ -50,6 +50,21 @@ public struct Theme: Sendable {
     public var sidebarText: Color
     public var sidebarSelection: Color
 
+    // MARK: - Component Dimensions
+    public var buttonCornerRadius: Float
+    public var buttonPaddingVertical: Float
+    public var buttonPaddingHorizontal: Float
+    public var textFieldCornerRadius: Float
+    public var textFieldDefaultWidth: Float
+    public var textFieldPaddingVertical: Float
+    public var textFieldPaddingHorizontal: Float
+    public var sheetCornerRadius: Float
+    public var sheetPadding: Float
+    public var sidebarPaddingVertical: Float
+    public var sidebarItemPaddingVertical: Float
+    public var sidebarItemPaddingHorizontal: Float
+    public var dividerHeight: Float
+
     public init(
         background: Color,
         surface: Color,
@@ -70,7 +85,21 @@ public struct Theme: Sendable {
         divider: Color,
         sidebarBackground: Color,
         sidebarText: Color,
-        sidebarSelection: Color
+        sidebarSelection: Color,
+        // Component dimensions (with sensible defaults)
+        buttonCornerRadius: Float = 6,
+        buttonPaddingVertical: Float = 8,
+        buttonPaddingHorizontal: Float = 16,
+        textFieldCornerRadius: Float = 4,
+        textFieldDefaultWidth: Float = 200,
+        textFieldPaddingVertical: Float = 8,
+        textFieldPaddingHorizontal: Float = 12,
+        sheetCornerRadius: Float = 12,
+        sheetPadding: Float = 24,
+        sidebarPaddingVertical: Float = 8,
+        sidebarItemPaddingVertical: Float = 8,
+        sidebarItemPaddingHorizontal: Float = 16,
+        dividerHeight: Float = 1
     ) {
         self.background = background
         self.surface = surface
@@ -92,6 +121,19 @@ public struct Theme: Sendable {
         self.sidebarBackground = sidebarBackground
         self.sidebarText = sidebarText
         self.sidebarSelection = sidebarSelection
+        self.buttonCornerRadius = buttonCornerRadius
+        self.buttonPaddingVertical = buttonPaddingVertical
+        self.buttonPaddingHorizontal = buttonPaddingHorizontal
+        self.textFieldCornerRadius = textFieldCornerRadius
+        self.textFieldDefaultWidth = textFieldDefaultWidth
+        self.textFieldPaddingVertical = textFieldPaddingVertical
+        self.textFieldPaddingHorizontal = textFieldPaddingHorizontal
+        self.sheetCornerRadius = sheetCornerRadius
+        self.sheetPadding = sheetPadding
+        self.sidebarPaddingVertical = sidebarPaddingVertical
+        self.sidebarItemPaddingVertical = sidebarItemPaddingVertical
+        self.sidebarItemPaddingHorizontal = sidebarItemPaddingHorizontal
+        self.dividerHeight = dividerHeight
     }
 }
 

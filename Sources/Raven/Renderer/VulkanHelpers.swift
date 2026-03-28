@@ -44,6 +44,31 @@ let vkColorComponentAllBits: VkColorComponentFlags = 0x0000000F
 let vkInstanceCreateEnumeratePortabilityBitKHR: VkInstanceCreateFlags = 0x00000001
 #endif
 
+// MARK: - Debug Utils Constants
+
+let VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT: VkDebugUtilsMessageSeverityFlagsEXT = 0x00000001
+let VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT: VkDebugUtilsMessageSeverityFlagsEXT = 0x00000010
+let VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT: VkDebugUtilsMessageSeverityFlagsEXT = 0x00000100
+let VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT: VkDebugUtilsMessageSeverityFlagsEXT = 0x00001000
+
+let VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT: VkDebugUtilsMessageTypeFlagsEXT = 0x00000001
+let VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT: VkDebugUtilsMessageTypeFlagsEXT = 0x00000002
+let VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT: VkDebugUtilsMessageTypeFlagsEXT = 0x00000004
+
+/// Whether Vulkan validation layers should be enabled.
+/// Set RAVEN_VULKAN_VALIDATION=1 in the environment to enable.
+let enableVulkanValidation: Bool = {
+    if let val = getenv("RAVEN_VULKAN_VALIDATION") {
+        let str = String(cString: val)
+        return str == "1" || str.lowercased() == "true"
+    }
+    #if DEBUG
+    return true
+    #else
+    return false
+    #endif
+}()
+
 // MARK: - Error Handling
 
 @inline(__always)

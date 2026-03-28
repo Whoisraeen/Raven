@@ -9,13 +9,12 @@ import PackageDescription
 #if os(macOS)
 
 // Homebrew: /opt/homebrew on Apple Silicon, /usr/local on Intel
-// Detect at build time isn't possible without Foundation; default to /opt/homebrew
-// and let users override via RAVEN_HOMEBREW_PREFIX env if needed.
-let homebrewPrefix = "/opt/homebrew"
+// Override via RAVEN_HOMEBREW_PREFIX env var if needed.
+let homebrewPrefix = Context.environment["RAVEN_HOMEBREW_PREFIX"] ?? "/opt/homebrew"
 
-let sdlLibraryPath = "\(homebrewPrefix)/lib"
-let vulkanIncludePath = "\(homebrewPrefix)/include"
-let vulkanLibraryPath = "\(homebrewPrefix)/lib"
+let sdlLibraryPath = Context.environment["RAVEN_SDL_LIB"] ?? "\(homebrewPrefix)/lib"
+let vulkanIncludePath = Context.environment["VULKAN_SDK"].map { "\($0)/include" } ?? "\(homebrewPrefix)/include"
+let vulkanLibraryPath = Context.environment["VULKAN_SDK"].map { "\($0)/lib" } ?? "\(homebrewPrefix)/lib"
 let ravenCoreLibPath = "rust/raven-core/target/release"
 
 let sdlIncludePath = "Sources/CSDL3"
@@ -45,13 +44,25 @@ let demoLinkerSettings: [LinkerSetting] = [
 
 #elseif os(Windows)
 
-// SDL3: vendored in the repo
-let sdlLibraryPath = "vendor/SDL3/SDL3-3.4.2/lib/x64"
+// SDL3: vendored in the repo — detect architecture
+// SPM doesn't expose arch, so check for ARM64 vendor path first, fallback to x64
+let sdlArm64Path = "vendor/SDL3/SDL3-3.4.2/lib/ARM64"
+let sdlX64Path = "vendor/SDL3/SDL3-3.4.2/lib/x64"
+// Default to x64; users on ARM64 should set RAVEN_SDL_LIB env var
+let sdlLibraryPath = Context.environment["RAVEN_SDL_LIB"] ?? sdlX64Path
 
-// Vulkan SDK: auto-detect from C:/VulkanSDK or use VULKAN_SDK env var
-let vulkanSDKEnv = Context.environment["VULKAN_SDK"]
-let vulkanIncludePath = vulkanSDKEnv.map { "\($0)/Include" } ?? "C:/VulkanSDK/1.4.341.1/Include"
-let vulkanLibraryPath = vulkanSDKEnv.map { "\($0)/Lib" } ?? "C:/VulkanSDK/1.4.341.1/Lib"
+// Vulkan SDK: require VULKAN_SDK env var (set by Vulkan SDK installer)
+let vulkanSDKEnv = Context.environment["VULKAN_SDK"] ?? Context.environment["VK_SDK_PATH"]
+let vulkanIncludePath: String
+let vulkanLibraryPath: String
+if let sdk = vulkanSDKEnv {
+    vulkanIncludePath = "\(sdk)/Include"
+    vulkanLibraryPath = "\(sdk)/Lib"
+} else {
+    // Emit a build warning — user must set VULKAN_SDK
+    vulkanIncludePath = "C:/VulkanSDK/Include"
+    vulkanLibraryPath = "C:/VulkanSDK/Lib"
+}
 
 // Rust static library
 let ravenCoreLibPath = "rust/raven-core/target/release"
@@ -103,9 +114,11 @@ let demoLinkerSettings: [LinkerSetting] = [
 
 #elseif os(Linux)
 
-let sdlLibraryPath = "/usr/lib"
-let vulkanIncludePath = "/usr/include"
-let vulkanLibraryPath = "/usr/lib"
+// Linux: use standard system paths or env overrides
+// Install deps: sudo apt install libsdl3-dev libvulkan-dev vulkan-tools
+let sdlLibraryPath = Context.environment["RAVEN_SDL_LIB"] ?? "/usr/lib/x86_64-linux-gnu"
+let vulkanIncludePath = Context.environment["VULKAN_SDK"].map { "\($0)/include" } ?? "/usr/include"
+let vulkanLibraryPath = Context.environment["VULKAN_SDK"].map { "\($0)/lib" } ?? "/usr/lib/x86_64-linux-gnu"
 let ravenCoreLibPath = "rust/raven-core/target/release"
 
 let sdlIncludePath = "Sources/CSDL3"

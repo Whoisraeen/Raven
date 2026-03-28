@@ -153,7 +153,7 @@ Swift gives developers a modern, expressive, type-safe API that feels familiar t
 | Intrinsic size caching | Done | Lazy compute, avoids redundant measureText |
 | Clipboard (get/set) | Done | Win32 API / pbcopy / xclip via Rust |
 | File dialogs (open/save/folder) | Done | PowerShell / osascript / zenity via Rust |
-| Raven CLI (build/run/dev/clean) | Done | Bash script + npm package (swift-raven) |
+| Raven CLI (build/run/dev/clean/bundle) | Done | npm package (swift-raven) with cross-platform bundler |
 | Accessibility tree collection | Done | Semantic roles, labels, values |
 | ViewBuilder with Parameter Packs | Done | Unlimited children via TupleView |
 | Font size control (.font modifier) | Done | Variable fontSize in measurement + rendering |
@@ -176,7 +176,7 @@ Swift gives developers a modern, expressive, type-safe API that feels familiar t
 | Alert / Menu / TabView | Missing | No system-level UI patterns |
 | Keyboard navigation | Missing | Only TextField has focus, no Tab nav |
 | Hot reload | Missing | raven dev watches files but does full restart |
-| Cross-compilation | Not started | Build only on host platform |
+| Cross-compilation | Not started | `raven bundle` packages for host platform; cross-compile not yet supported |
 | SVG / vector graphics | Not started | Only raster images supported |
 | VkPipelineCache | Missing | Pipelines recreated from scratch on each launch |
 | Vulkan validation layer integration | Missing | No debug messenger for catching Vulkan misuse |
@@ -357,7 +357,7 @@ Each frame: AnimationEngine.tick(deltaTime:)
 | **Platform** | `Platform/RavenCore.swift` | Swift wrapper for Rust FFI (clipboard, file dialogs) |
 | **Rust Core** | `rust/raven-core/` | Platform detection, clipboard (Win32/pbcopy/xclip), file dialogs (PowerShell/osascript/zenity) |
 | **C Modules** | `CRavenCore/`, `CSDL3/`, `CVulkan/` | Module maps for Rust FFI, SDL3, Vulkan headers |
-| **CLI** | `raven`, `raven.bat`, `cli/` | Build orchestration (Rust+Swift), dev mode, npm package |
+| **CLI** | `raven`, `raven.bat`, `cli/` | Build orchestration (Rust+Swift), dev mode, bundler, npm package |
 
 ---
 
@@ -413,6 +413,11 @@ Each frame: AnimationEngine.tick(deltaTime:)
 - [x] onAppear / onDisappear lifecycle callbacks
 - [x] onTapGesture modifier
 - [x] textWrap modifier for explicit word wrap width
+
+#### Tooling (Done)
+- [x] `raven bundle` command — packages app for distribution (Windows .exe+DLLs, macOS .app, Linux bin+launcher)
+- [x] Rust file dialog filter support on all platforms
+- [x] `raven_core_last_error()` for FFI error context
 
 #### Platform (Remaining)
 - [ ] macOS builds via MoltenVK
@@ -522,6 +527,9 @@ raven dev
 # Create new project
 raven init my-app
 
+# Bundle for distribution (release build + deps + resources)
+raven bundle --target=MyApp
+
 # Clean build artifacts
 raven clean
 ```
@@ -606,4 +614,4 @@ Quality first. Everything else follows.
 
 ---
 
-*This document represents the complete product vision, technical architecture, implementation status, known issues, and development roadmap for Raven as of March 2026.*
+*This document represents the complete product vision, technical architecture, implementation status, known issues, and development roadmap for Raven as of March 28, 2026.*

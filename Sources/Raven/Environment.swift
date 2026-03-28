@@ -117,32 +117,40 @@ extension View {
 
 /// Global store for environment values during a view resolution pass.
 /// ViewResolver pushes/pops scopes as it enters/leaves subtrees with environment overrides.
-/// - Important: Must only be accessed from the main thread (SDL event loop).
+/// Thread-safe via RavenLock.
 public class EnvironmentStore: @unchecked Sendable {
     public static let shared = EnvironmentStore()
     private init() {}
 
     private var stack: [EnvironmentValues] = [EnvironmentValues()]
+    private let lock = RavenLock()
 
     /// The current environment values (top of stack).
     public var current: EnvironmentValues {
-        stack.last ?? EnvironmentValues()
+        lock.withLock { stack.last ?? EnvironmentValues() }
     }
 
     /// Push a new environment scope (inheriting + merging overrides).
     public func push(_ overrides: EnvironmentValues) {
-        stack.append(current.merging(overrides))
+        lock.withLock {
+            let base = stack.last ?? EnvironmentValues()
+            stack.append(base.merging(overrides))
+        }
     }
 
     /// Pop the current scope, returning to the parent environment.
     @discardableResult
     public func pop() -> EnvironmentValues {
-        guard stack.count > 1 else { return current }
-        return stack.removeLast()
+        lock.withLock {
+            guard stack.count > 1 else { return stack.last ?? EnvironmentValues() }
+            return stack.removeLast()
+        }
     }
 
     /// Reset to a fresh root environment (called at start of each resolution pass).
     public func reset(with base: EnvironmentValues = EnvironmentValues()) {
-        stack = [base]
+        lock.withLock {
+            stack = [base]
+        }
     }
 }

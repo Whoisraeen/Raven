@@ -53,3 +53,7 @@ build_log.txt
 .ai/
 .prompts/
 .gemini/
+
+# ─── Documentation ───
+Analysis.md
+RAVEN_FRAMEWORK_DOCUMENT.md

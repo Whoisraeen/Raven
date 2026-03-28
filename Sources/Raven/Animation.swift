@@ -39,16 +39,22 @@ public enum AnimatableProperty: Hashable, Sendable {
 // MARK: - AnimationEngine
 
 /// Manages active animations and interpolates values over time.
-/// - Important: Must only be accessed from the main thread (SDL event loop).
+/// Thread-safe via RavenLock for the animation context; tick() must still be called from the main thread.
 public class AnimationEngine: @unchecked Sendable {
     public static let shared = AnimationEngine()
-    
+
     private var activeAnimations: [AnimationInstance] = []
-    
+    private let lock = RavenLock()
+
     private init() {}
     
-    /// The current animation context (set by withAnimation)
-    public internal(set) var currentAnimation: Animation? = nil
+    /// The current animation context (set by withAnimation).
+    /// Protected by lock for safe access from background closures.
+    private var _currentAnimation: Animation? = nil
+    public var currentAnimation: Animation? {
+        get { lock.withLock { _currentAnimation } }
+        set { lock.withLock { _currentAnimation = newValue } }
+    }
     
     /// Update all active animations. Called every frame.
     public func tick(deltaTime: Double) {

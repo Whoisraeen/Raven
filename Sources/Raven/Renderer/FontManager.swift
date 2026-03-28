@@ -6,10 +6,13 @@ import CVulkan
 /// Manages font loading and SDF glyph atlas generation using stb_truetype.
 /// Supports loading TTF fonts, generating SDF glyphs on demand,
 /// and maintaining a dynamic texture atlas.
-/// - Important: Must only be accessed from the main thread (SDL event loop).
+/// Thread-safe via RavenLock — glyph cache and atlas access are synchronized.
 public class FontManager: @unchecked Sendable {
     /// Singleton instance
     public static let shared = FontManager()
+
+    /// Lock protecting glyph cache and atlas data
+    private let lock = RavenLock()
 
     // Font info from stb_truetype
     private var fontInfo = stbtt_fontinfo()

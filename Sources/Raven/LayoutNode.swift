@@ -4,6 +4,13 @@
 /// The layout engine populates position and size, then the render
 /// collector flattens the tree into drawable quads.
 public class LayoutNode {
+    /// Create a flexible spacer node (used internally by ViewResolver).
+    static func spacerNode() -> LayoutNode {
+        let node = LayoutNode()
+        node.isFlexible = true
+        return node
+    }
+
     /// Absolute position (top-left corner)
     public var x: Float = 0 {
         didSet { if oldValue != x { animate(.x, from: oldValue, to: x) } }

@@ -182,33 +182,40 @@ public class StateVar<Value: Sendable>: @unchecked Sendable {
 
 /// Global tracker that monitors whether any @State/@Published/StateVar has changed.
 /// The app loop checks this each frame to decide whether to re-render.
-/// - Important: Must only be accessed from the main thread (SDL event loop).
+/// Thread-safe via an unfair lock so background closures can safely mutate state.
 public class StateTracker: @unchecked Sendable {
     public static let shared = StateTracker()
 
     private var dirty = false
     public private(set) var dirtyPaths: Set<String> = []
+    private let lock = RavenLock()
 
     private init() {}
 
     /// Mark that a state value has changed globally.
     public func markDirty() {
-        dirty = true
+        lock.withLock {
+            dirty = true
+        }
     }
-    
+
     /// Mark a specific view path as dirty.
     public func markDirty(path: String) {
-        dirty = true
-        dirtyPaths.insert(path)
+        lock.withLock {
+            dirty = true
+            dirtyPaths.insert(path)
+        }
     }
 
     /// Check and clear the dirty flag.
     /// Returns the set of dirty paths if any state changed since last check, nil otherwise.
     public func checkAndClear() -> Set<String>? {
-        guard dirty else { return nil }
-        let paths = dirtyPaths
-        dirty = false
-        dirtyPaths.removeAll()
-        return paths
+        lock.withLock {
+            guard dirty else { return nil }
+            let paths = dirtyPaths
+            dirty = false
+            dirtyPaths.removeAll()
+            return paths
+        }
     }
 }

@@ -1,3 +1,50 @@
+// MARK: - Thread Safety
+
+#if canImport(WinSDK)
+import WinSDK
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Darwin)
+import Darwin
+#endif
+
+/// A lightweight, non-recursive lock for protecting shared mutable state.
+/// Uses platform-native primitives (SRWLock on Windows, pthread_mutex elsewhere).
+final class RavenLock: @unchecked Sendable {
+    #if canImport(WinSDK)
+    private var srwLock = SRWLOCK()
+
+    init() {
+        InitializeSRWLock(&srwLock)
+    }
+
+    func lock() { AcquireSRWLockExclusive(&srwLock) }
+    func unlock() { ReleaseSRWLockExclusive(&srwLock) }
+    #else
+    private var mutex = pthread_mutex_t()
+
+    init() {
+        pthread_mutex_init(&mutex, nil)
+    }
+
+    deinit {
+        pthread_mutex_destroy(&mutex)
+    }
+
+    func lock() { pthread_mutex_lock(&mutex) }
+    func unlock() { pthread_mutex_unlock(&mutex) }
+    #endif
+
+    @discardableResult
+    func withLock<T>(_ body: () throws -> T) rethrows -> T {
+        lock()
+        defer { unlock() }
+        return try body()
+    }
+}
+
 // MARK: - Color
 
 /// A simple RGBA color type.

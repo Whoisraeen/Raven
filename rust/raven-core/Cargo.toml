@@ -1,7 +1,11 @@
 [package]
 name = "raven-core"
+# Keep in sync with /version.json (single source of truth)
 version = "0.1.0"
 edition = "2021"
 
 [lib]
 crate-type = ["staticlib"]
+
+[build-dependencies]
+# No build deps needed — version sync is manual. Use `raven version` to verify.

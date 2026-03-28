@@ -1,6 +1,30 @@
 import CSDL3
 import CVulkan
 
+// MARK: - Vulkan Debug Callback (global C function)
+
+/// C-compatible callback for Vulkan validation layer messages.
+private func vulkanDebugCallback(
+    _ messageSeverity: VkDebugUtilsMessageSeverityFlagBitsEXT,
+    _ messageType: VkDebugUtilsMessageTypeFlagsEXT,
+    _ pCallbackData: UnsafePointer<VkDebugUtilsMessengerCallbackDataEXT>?,
+    _ pUserData: UnsafeMutableRawPointer?
+) -> VkBool32 {
+    guard let data = pCallbackData?.pointee else { return 0 }
+    let message = data.pMessage.map { String(cString: $0) } ?? "(no message)"
+
+    let severity: String
+    if messageSeverity.rawValue >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT {
+        severity = "ERROR"
+    } else if messageSeverity.rawValue >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT {
+        severity = "WARNING"
+    } else {
+        severity = "INFO"
+    }
+
+    print("[Vulkan \(severity)] \(message)")
+    return 0 // VK_FALSE — don't abort the call
+}
 
 // MARK: - VulkanRenderer
 
@@ -43,6 +67,9 @@ final class VulkanRenderer: @unchecked Sendable {
     // Vertex buffer
     private var vertexBuffer: VulkanBuffer?
     private var vertexCount: UInt32 = 0
+
+    // Debug messenger (nil if validation layers are disabled)
+    private var debugMessenger: VkDebugUtilsMessengerEXT?
 
     // Allocation callbacks
     private let allocationCallbacks: UnsafePointer<VkAllocationCallbacks>? = nil
@@ -145,6 +172,15 @@ final class VulkanRenderer: @unchecked Sendable {
         extensionNames.append(UnsafePointer(portabilityExtName))
         #endif
 
+        // Add debug utils extension if validation is enabled
+        var debugExtName: UnsafeMutablePointer<CChar>?
+        if enableVulkanValidation {
+            debugExtName = SDL_strdup("VK_EXT_debug_utils")
+            if let name = debugExtName {
+                extensionNames.append(UnsafePointer(name))
+            }
+        }
+
         var instanceFlags: VkInstanceCreateFlags = 0
         #if os(macOS)
         instanceFlags = vkInstanceCreateEnumeratePortabilityBitKHR
@@ -152,35 +188,57 @@ final class VulkanRenderer: @unchecked Sendable {
 
         let finalExtensionCount = UInt32(extensionNames.count)
 
+        // Validation layer name
+        let validationLayerName = "VK_LAYER_KHRONOS_validation"
+        var layerNames: [UnsafePointer<CChar>?] = []
+        var validationLayerNameStr: UnsafeMutablePointer<CChar>?
+        if enableVulkanValidation {
+            validationLayerNameStr = SDL_strdup(validationLayerName)
+            if let name = validationLayerNameStr {
+                layerNames.append(UnsafePointer(name))
+            }
+        }
+
         var instanceHandle: VkInstance?
         extensionNames.withUnsafeBufferPointer { extensionBuffer in
-            "Raven Vulkan Bootstrap".withCString { applicationName in
-                "Raven".withCString { engineName in
-                    var appInfo = VkApplicationInfo(
-                        sType: VK_STRUCTURE_TYPE_APPLICATION_INFO,
-                        pNext: nil,
-                        pApplicationName: applicationName,
-                        applicationVersion: 1,
-                        pEngineName: engineName,
-                        engineVersion: 1,
-                        apiVersion: vkApiVersion1_0
-                    )
-
-                    withUnsafePointer(to: &appInfo) { appInfoPointer in
-                        var instanceCreateInfo = VkInstanceCreateInfo(
-                            sType: VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+            layerNames.withUnsafeBufferPointer { layerBuffer in
+                "Raven Vulkan Bootstrap".withCString { applicationName in
+                    "Raven".withCString { engineName in
+                        var appInfo = VkApplicationInfo(
+                            sType: VK_STRUCTURE_TYPE_APPLICATION_INFO,
                             pNext: nil,
-                            flags: instanceFlags,
-                            pApplicationInfo: appInfoPointer,
-                            enabledLayerCount: 0,
-                            ppEnabledLayerNames: nil,
-                            enabledExtensionCount: finalExtensionCount,
-                            ppEnabledExtensionNames: extensionBuffer.baseAddress
+                            pApplicationName: applicationName,
+                            applicationVersion: 1,
+                            pEngineName: engineName,
+                            engineVersion: 1,
+                            apiVersion: vkApiVersion1_0
                         )
-                        vkCheck(
-                            vkCreateInstance(&instanceCreateInfo, nil, &instanceHandle),
-                            "vkCreateInstance"
-                        )
+
+                        withUnsafePointer(to: &appInfo) { appInfoPointer in
+                            var instanceCreateInfo = VkInstanceCreateInfo(
+                                sType: VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+                                pNext: nil,
+                                flags: instanceFlags,
+                                pApplicationInfo: appInfoPointer,
+                                enabledLayerCount: UInt32(layerNames.count),
+                                ppEnabledLayerNames: layerNames.isEmpty ? nil : layerBuffer.baseAddress,
+                                enabledExtensionCount: finalExtensionCount,
+                                ppEnabledExtensionNames: extensionBuffer.baseAddress
+                            )
+                            let result = vkCreateInstance(&instanceCreateInfo, nil, &instanceHandle)
+                            if result != VK_SUCCESS && !layerNames.isEmpty {
+                                // Validation layer may not be installed — retry without it
+                                print("[Raven] Vulkan validation layer not available, proceeding without.")
+                                instanceCreateInfo.enabledLayerCount = 0
+                                instanceCreateInfo.ppEnabledLayerNames = nil
+                                vkCheck(
+                                    vkCreateInstance(&instanceCreateInfo, nil, &instanceHandle),
+                                    "vkCreateInstance"
+                                )
+                            } else if result != VK_SUCCESS {
+                                fail("vkCreateInstance failed with VkResult \(result.rawValue)")
+                            }
+                        }
                     }
                 }
             }
@@ -189,8 +247,15 @@ final class VulkanRenderer: @unchecked Sendable {
         #if os(macOS)
         SDL_free(portabilityExtName)
         #endif
+        if let name = debugExtName { SDL_free(name) }
+        if let name = validationLayerNameStr { SDL_free(name) }
 
         guard let instance = instanceHandle else { fail("vkCreateInstance returned null") }
+
+        // --- Debug Messenger (if validation is enabled) ---
+        if enableVulkanValidation {
+            setupDebugMessenger(instance: instance)
+        }
 
         // --- Surface ---
         var surfaceHandle: VkSurfaceKHR?
@@ -749,6 +814,43 @@ final class VulkanRenderer: @unchecked Sendable {
         let w = max(UInt32(clip.width), 1)
         let h = max(UInt32(clip.height), 1)
         return VkRect2D(offset: VkOffset2D(x: x, y: y), extent: VkExtent2D(width: w, height: h))
+    }
+
+    // MARK: - Debug Messenger
+
+    private static func setupDebugMessenger(instance: VkInstance) {
+        // Load the function pointer dynamically since it's an extension
+        "vkCreateDebugUtilsMessengerEXT".withCString { name in
+            guard let rawFn = vkGetInstanceProcAddr(instance, name) else {
+                print("[Raven] VK_EXT_debug_utils not available, skipping debug messenger.")
+                return
+            }
+
+            typealias CreateFn = @convention(c) (
+                VkInstance?,
+                UnsafePointer<VkDebugUtilsMessengerCreateInfoEXT>?,
+                UnsafePointer<VkAllocationCallbacks>?,
+                UnsafeMutablePointer<VkDebugUtilsMessengerEXT?>?
+            ) -> VkResult
+
+            let createFn = unsafeBitCast(rawFn, to: CreateFn.self)
+
+            var createInfo = VkDebugUtilsMessengerCreateInfoEXT(
+                sType: VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+                pNext: nil,
+                flags: 0,
+                messageSeverity: VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT,
+                messageType: VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT,
+                pfnUserCallback: vulkanDebugCallback,
+                pUserData: nil
+            )
+
+            var messenger: VkDebugUtilsMessengerEXT?
+            let result = createFn(instance, &createInfo, nil, &messenger)
+            if result == VK_SUCCESS {
+                print("[Raven] Vulkan validation layer debug messenger enabled.")
+            }
+        }
     }
 
     // MARK: - Cleanup

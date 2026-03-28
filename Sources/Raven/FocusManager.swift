@@ -4,7 +4,7 @@ import CSDL3
 
 /// Manages keyboard focus for text input fields.
 /// Only one node can have focus at a time.
-/// - Important: Must only be accessed from the main thread (SDL event loop).
+/// Thread-safe via RavenLock.
 public class FocusManager: @unchecked Sendable {
     public static let shared = FocusManager()
 
@@ -17,87 +17,101 @@ public class FocusManager: @unchecked Sendable {
     /// The text binding for the focused field
     private var focusedBinding: Binding<String>? = nil
 
+    private let lock = RavenLock()
+
     private init() {}
 
     /// Set focus to a specific field.
     public func setFocus(fieldId: String, binding: Binding<String>) {
-        focusedFieldId = fieldId
-        focusedBinding = binding
-        cursorPosition = binding.wrappedValue.count
+        lock.withLock {
+            focusedFieldId = fieldId
+            focusedBinding = binding
+            cursorPosition = binding.wrappedValue.count
+        }
         SDL_StartTextInput(nil)
     }
 
     /// Clear focus (e.g., user clicked outside all fields).
     public func clearFocus() {
-        focusedFieldId = nil
-        focusedBinding = nil
-        cursorPosition = 0
+        lock.withLock {
+            focusedFieldId = nil
+            focusedBinding = nil
+            cursorPosition = 0
+        }
         SDL_StopTextInput(nil)
     }
 
     /// Check if a specific field has focus.
     public func hasFocus(_ fieldId: String) -> Bool {
-        focusedFieldId == fieldId
+        lock.withLock { focusedFieldId == fieldId }
     }
 
     /// Handle text input (from SDL_EVENT_TEXT_INPUT).
     public func handleTextInput(_ text: String) {
-        guard var currentText = focusedBinding?.wrappedValue else { return }
+        lock.withLock {
+            guard var currentText = focusedBinding?.wrappedValue else { return }
 
-        let insertIndex = currentText.index(
-            currentText.startIndex,
-            offsetBy: min(cursorPosition, currentText.count)
-        )
-        currentText.insert(contentsOf: text, at: insertIndex)
-        focusedBinding?.wrappedValue = currentText
-        cursorPosition += text.count
+            let insertIndex = currentText.index(
+                currentText.startIndex,
+                offsetBy: min(cursorPosition, currentText.count)
+            )
+            currentText.insert(contentsOf: text, at: insertIndex)
+            focusedBinding?.wrappedValue = currentText
+            cursorPosition += text.count
+        }
     }
 
     /// Handle backspace key.
     public func handleBackspace() {
-        guard var currentText = focusedBinding?.wrappedValue,
-              cursorPosition > 0 else { return }
+        lock.withLock {
+            guard var currentText = focusedBinding?.wrappedValue,
+                  cursorPosition > 0 else { return }
 
-        let deleteIndex = currentText.index(
-            currentText.startIndex,
-            offsetBy: cursorPosition - 1
-        )
-        currentText.remove(at: deleteIndex)
-        focusedBinding?.wrappedValue = currentText
-        cursorPosition -= 1
+            let deleteIndex = currentText.index(
+                currentText.startIndex,
+                offsetBy: cursorPosition - 1
+            )
+            currentText.remove(at: deleteIndex)
+            focusedBinding?.wrappedValue = currentText
+            cursorPosition -= 1
+        }
     }
 
     /// Handle delete key.
     public func handleDelete() {
-        guard var currentText = focusedBinding?.wrappedValue,
-              cursorPosition < currentText.count else { return }
+        lock.withLock {
+            guard var currentText = focusedBinding?.wrappedValue,
+                  cursorPosition < currentText.count else { return }
 
-        let deleteIndex = currentText.index(
-            currentText.startIndex,
-            offsetBy: cursorPosition
-        )
-        currentText.remove(at: deleteIndex)
-        focusedBinding?.wrappedValue = currentText
+            let deleteIndex = currentText.index(
+                currentText.startIndex,
+                offsetBy: cursorPosition
+            )
+            currentText.remove(at: deleteIndex)
+            focusedBinding?.wrappedValue = currentText
+        }
     }
 
     /// Move cursor left.
     public func moveCursorLeft() {
-        if cursorPosition > 0 { cursorPosition -= 1 }
+        lock.withLock { if cursorPosition > 0 { cursorPosition -= 1 } }
     }
 
     /// Move cursor right.
     public func moveCursorRight() {
-        let textLength = focusedBinding?.wrappedValue.count ?? 0
-        if cursorPosition < textLength { cursorPosition += 1 }
+        lock.withLock {
+            let textLength = focusedBinding?.wrappedValue.count ?? 0
+            if cursorPosition < textLength { cursorPosition += 1 }
+        }
     }
 
     /// Move cursor to beginning.
     public func moveCursorHome() {
-        cursorPosition = 0
+        lock.withLock { cursorPosition = 0 }
     }
 
     /// Move cursor to end.
     public func moveCursorEnd() {
-        cursorPosition = focusedBinding?.wrappedValue.count ?? 0
+        lock.withLock { cursorPosition = focusedBinding?.wrappedValue.count ?? 0 }
     }
 }

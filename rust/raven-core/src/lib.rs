@@ -37,7 +37,9 @@ pub extern "C" fn raven_core_last_error() -> *const c_char {
 
 #[no_mangle]
 pub extern "C" fn raven_core_version() -> *const c_char {
-    c"0.1.0".as_ptr()
+    // Version is injected at build time from /version.json via build.rs
+    static VERSION: &[u8] = concat!(env!("RAVEN_VERSION"), "\0").as_bytes();
+    VERSION.as_ptr() as *const c_char
 }
 
 #[no_mangle]
