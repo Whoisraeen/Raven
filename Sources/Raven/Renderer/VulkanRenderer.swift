@@ -474,6 +474,7 @@ final class VulkanRenderer: @unchecked Sendable {
 
     // MARK: - Draw Frame
 
+    private var pendingQuads: [Quad] = []
     private var pendingTextCommands: [TextDrawCommand] = []
     private var pendingImageCommands: [ImageDrawCommand] = []
 
@@ -483,6 +484,7 @@ final class VulkanRenderer: @unchecked Sendable {
         let allVertices = quads.flatMap { $0.vertices() }
         let vertexDataSize = VkDeviceSize(MemoryLayout<QuadVertex>.stride * allVertices.count)
 
+        self.pendingQuads = quads
         self.pendingTextCommands = textCommands
         self.pendingImageCommands = imageCommands
 
@@ -676,14 +678,43 @@ final class VulkanRenderer: @unchecked Sendable {
             )
         }
 
-        // Bind vertex buffer and draw quads
+        // Bind vertex buffer and draw quads in clip-rect batches
         if let vb = vertexBuffer?.buffer, vertexCount > 0 {
             var vertexBufferHandle: VkBuffer? = vb
             var offset: VkDeviceSize = 0
             withUnsafePointer(to: &vertexBufferHandle) { bufferPtr in
                 vkCmdBindVertexBuffers(commandBuffer, 0, 1, bufferPtr, &offset)
             }
-            vkCmdDraw(commandBuffer, vertexCount, 1, 0, 0)
+
+            // Draw quads in batches grouped by clip rect
+            var batchStart: UInt32 = 0
+            var currentClip = pendingQuads.first?.clipRect ?? .none
+            let fullScissor = VkRect2D(offset: VkOffset2D(x: 0, y: 0), extent: swapchainExtent)
+
+            for (i, quad) in pendingQuads.enumerated() {
+                if quad.clipRect != currentClip {
+                    // Draw the previous batch
+                    let batchVertexCount = UInt32(i) * 6 - batchStart
+                    if batchVertexCount > 0 {
+                        var s = clipRectToVkRect2D(currentClip, fallback: fullScissor)
+                        vkCmdSetScissor(commandBuffer, 0, 1, &s)
+                        vkCmdDraw(commandBuffer, batchVertexCount, 1, batchStart, 0)
+                    }
+                    batchStart = UInt32(i) * 6
+                    currentClip = quad.clipRect
+                }
+            }
+            // Draw final batch
+            let remaining = vertexCount - batchStart
+            if remaining > 0 {
+                var s = clipRectToVkRect2D(currentClip, fallback: fullScissor)
+                vkCmdSetScissor(commandBuffer, 0, 1, &s)
+                vkCmdDraw(commandBuffer, remaining, 1, batchStart, 0)
+            }
+
+            // Reset scissor to full viewport for subsequent pipelines
+            var resetScissor = fullScissor
+            vkCmdSetScissor(commandBuffer, 0, 1, &resetScissor)
         }
 
         // Draw images (between quads and text so images appear under text)
@@ -708,6 +739,16 @@ final class VulkanRenderer: @unchecked Sendable {
 
         vkCmdEndRenderPass(commandBuffer)
         vkCheck(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer")
+    }
+
+    /// Convert a ClipRect to a VkRect2D, clamped to valid range. Returns fallback if clip is .none.
+    private func clipRectToVkRect2D(_ clip: ClipRect, fallback: VkRect2D) -> VkRect2D {
+        if clip.isNone { return fallback }
+        let x = max(Int32(clip.x), 0)
+        let y = max(Int32(clip.y), 0)
+        let w = max(UInt32(clip.width), 1)
+        let h = max(UInt32(clip.height), 1)
+        return VkRect2D(offset: VkOffset2D(x: x, y: y), extent: VkExtent2D(width: w, height: h))
     }
 
     // MARK: - Cleanup

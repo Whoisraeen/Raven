@@ -38,7 +38,11 @@ public class EventDispatcher {
 
     /// Recursive hit test — returns the deepest node containing (x, y).
     /// Children are tested in reverse order (front-to-back visually).
+    /// Skips hidden and disabled nodes.
     public static func hitTest(x: Float, y: Float, node: LayoutNode) -> LayoutNode? {
+        // Skip hidden or disabled nodes entirely
+        if node.isHidden || node.isDisabled { return nil }
+
         // Check children first (front-to-back, last child is on top)
         for child in node.children.reversed() {
             if let hit = hitTest(x: x, y: y, node: child) {

@@ -9,6 +9,7 @@ const char* raven_core_version(void);
 int raven_core_init(void);
 const char* raven_core_platform_name(void);
 char* raven_core_os_version(void);
+const char* raven_core_last_error(void);
 void raven_core_free_string(char* ptr);
 
 /* Clipboard */

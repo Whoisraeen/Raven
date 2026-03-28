@@ -213,37 +213,78 @@ public class FontManager: @unchecked Sendable {
     }
 
     /// Measure the width and height of a string at a given font size.
-    public func measureText(_ text: String, fontSize: Float) -> (width: Float, height: Float) {
+    /// Supports multi-line text via `\n` and optional word wrapping via `maxWidth`.
+    public func measureText(_ text: String, fontSize: Float, maxWidth: Float = 0) -> (width: Float, height: Float) {
         let metrics = getMetrics(fontSize: fontSize)
-        let height = metrics.lineHeight
+        let lineHeight = metrics.lineHeight
 
         guard fontLoaded else {
-            // Fallback to monospace 8px-based approximation for the fallback font
-            return (width: Float(text.count) * (fontSize / 2.0), height: height)
+            // Fallback: handle newlines in approximation
+            let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+            let maxLineWidth = lines.map { Float($0.count) * (fontSize / 2.0) }.max() ?? 0
+            return (width: maxLineWidth, height: lineHeight * Float(max(lines.count, 1)))
         }
 
-        var width: Float = 0
+        let scale = stbtt_ScaleForPixelHeight(&fontInfo, fontSize)
+        var maxLineWidth: Float = 0
+        var lineWidth: Float = 0
+        var lineCount: Float = 1
         var prevCodepoint: UInt32 = 0
+        var wordWidth: Float = 0
+        var wordStart: Bool = true
 
         for char in text {
-            let cp = char.unicodeScalars.first.map { UInt32($0.value) } ?? 32
-            
-            if prevCodepoint != 0 {
-                width += getKerning(cp1: prevCodepoint, cp2: cp, fontSize: fontSize)
+            // Handle explicit newlines
+            if char == "\n" {
+                maxLineWidth = max(maxLineWidth, lineWidth)
+                lineWidth = 0
+                lineCount += 1
+                prevCodepoint = 0
+                wordWidth = 0
+                wordStart = true
+                continue
             }
-            
-            // Just get advance, avoid generating SDF if not needed
-            let scale = stbtt_ScaleForPixelHeight(&fontInfo, fontSize)
+
+            let cp = char.unicodeScalars.first.map { UInt32($0.value) } ?? 32
+
+            if prevCodepoint != 0 {
+                let kern = getKerning(cp1: prevCodepoint, cp2: cp, fontSize: fontSize)
+                lineWidth += kern
+                wordWidth += kern
+            }
+
             let glyphIndex = stbtt_FindGlyphIndex(&fontInfo, Int32(cp))
             var advanceWidth: Int32 = 0
             var leftSideBearing: Int32 = 0
             stbtt_GetGlyphHMetrics(&fontInfo, glyphIndex, &advanceWidth, &leftSideBearing)
-            width += Float(advanceWidth) * scale
-            
+            let advance = Float(advanceWidth) * scale
+
+            if char == " " {
+                lineWidth += advance
+                wordWidth = 0
+                wordStart = true
+            } else {
+                if wordStart { wordWidth = 0; wordStart = false }
+                wordWidth += advance
+
+                // Word wrap: if we have a maxWidth and this word pushes past it
+                if maxWidth > 0 && lineWidth + advance > maxWidth && lineWidth > 0 {
+                    maxLineWidth = max(maxLineWidth, lineWidth - wordWidth)
+                    lineWidth = wordWidth
+                    lineCount += 1
+                    prevCodepoint = cp
+                    lineWidth += advance - wordWidth + wordWidth // already counted
+                    continue
+                }
+
+                lineWidth += advance
+            }
+
             prevCodepoint = cp
         }
 
-        return (width: width, height: height)
+        maxLineWidth = max(maxLineWidth, lineWidth)
+        return (width: maxLineWidth, height: lineHeight * lineCount)
     }
 
     // MARK: - Atlas Access
@@ -304,13 +345,12 @@ public class FontManager: @unchecked Sendable {
         atlasData = newData
         atlasDirty = true
 
-        // Invalidate UV cache since atlas size changed
-        let fontSize = glyphCache.values.first?.fontSize ?? 16
+        // Recalculate UV coordinates: atlas doubled, so all UVs halve
         for (key, var info) in glyphCache {
-            info.u0 = info.u0 * Float(atlasWidth / 2) / Float(atlasWidth)
-            info.v0 = info.v0 * Float(atlasHeight / 2) / Float(atlasHeight)
-            info.u1 = info.u1 * Float(atlasWidth / 2) / Float(atlasWidth)
-            info.v1 = info.v1 * Float(atlasHeight / 2) / Float(atlasHeight)
+            info.u0 *= 0.5
+            info.v0 *= 0.5
+            info.u1 *= 0.5
+            info.v1 *= 0.5
             glyphCache[key] = info
         }
 

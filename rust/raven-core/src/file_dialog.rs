@@ -80,12 +80,17 @@ pub fn select_folder(title: *const c_char) -> *mut c_char {
 // --- Windows implementations using COM/IFileDialog ---
 
 #[cfg(target_os = "windows")]
-fn show_open_dialog(title: &str, _filter: Option<&str>) -> Option<String> {
+fn show_open_dialog(title: &str, filter: Option<&str>) -> Option<String> {
     use std::process::Command;
     // Use PowerShell's OpenFileDialog for simplicity and reliability.
+    let filter_part = match filter {
+        Some(f) if !f.is_empty() => format!("$d.Filter = '{}'; ", f.replace('\'', "''")),
+        _ => String::from("$d.Filter = 'All Files (*.*)|*.*'; "),
+    };
     let script = format!(
-        r#"Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = '{}'; if ($d.ShowDialog() -eq 'OK') {{ $d.FileName }}"#,
-        title.replace('\'', "''")
+        r#"Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = '{}'; {}if ($d.ShowDialog() -eq 'OK') {{ $d.FileName }}"#,
+        title.replace('\'', "''"),
+        filter_part
     );
     Command::new("powershell")
         .args(["-NoProfile", "-Command", &script])
@@ -136,11 +141,22 @@ fn show_folder_dialog(title: &str) -> Option<String> {
 // --- macOS implementations using osascript ---
 
 #[cfg(target_os = "macos")]
-fn show_open_dialog(title: &str, _filter: Option<&str>) -> Option<String> {
+fn show_open_dialog(title: &str, filter: Option<&str>) -> Option<String> {
     use std::process::Command;
+    // Filter format: "txt,png,jpg" — converted to AppleScript type list
+    let type_part = match filter {
+        Some(f) if !f.is_empty() => {
+            let types: Vec<String> = f.split(',')
+                .map(|t| format!(r#""{}""#, t.trim().trim_start_matches('.')))
+                .collect();
+            format!(r#" of type {{{}}}"#, types.join(", "))
+        }
+        _ => String::new(),
+    };
     let script = format!(
-        r#"choose file with prompt "{}""#,
-        title.replace('"', "\\\"")
+        r#"choose file with prompt "{}"{}"#,
+        title.replace('"', "\\\""),
+        type_part
     );
     Command::new("osascript")
         .args(["-e", &script])
@@ -203,10 +219,23 @@ fn show_folder_dialog(title: &str) -> Option<String> {
 // --- Linux implementations using zenity ---
 
 #[cfg(target_os = "linux")]
-fn show_open_dialog(title: &str, _filter: Option<&str>) -> Option<String> {
+fn show_open_dialog(title: &str, filter: Option<&str>) -> Option<String> {
     use std::process::Command;
+    let mut args = vec!["--file-selection", "--title", title];
+    let filter_arg;
+    if let Some(f) = filter {
+        if !f.is_empty() {
+            // zenity filter format: --file-filter="Images | *.png *.jpg"
+            let exts: Vec<String> = f.split(',')
+                .map(|t| format!("*.{}", t.trim().trim_start_matches('.')))
+                .collect();
+            filter_arg = format!("Files | {}", exts.join(" "));
+            args.push("--file-filter");
+            args.push(&filter_arg);
+        }
+    }
     Command::new("zenity")
-        .args(["--file-selection", "--title", title])
+        .args(&args)
         .output()
         .ok()
         .and_then(|out| {

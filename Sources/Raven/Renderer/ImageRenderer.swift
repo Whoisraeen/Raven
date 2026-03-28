@@ -11,13 +11,14 @@ public struct ImageDrawCommand {
     public var width: Float
     public var height: Float
     public var opacity: Float
+    public var clipRect: ClipRect = .none
 
     public init(textureId: String, x: Float, y: Float,
-                width: Float, height: Float, opacity: Float = 1.0) {
+                width: Float, height: Float, opacity: Float = 1.0, clipRect: ClipRect = .none) {
         self.textureId = textureId
         self.x = x; self.y = y
         self.width = width; self.height = height
-        self.opacity = opacity
+        self.opacity = opacity; self.clipRect = clipRect
     }
 }
 

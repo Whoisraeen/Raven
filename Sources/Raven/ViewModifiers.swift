@@ -117,6 +117,63 @@ public struct AccessibilityRoleModifier: ViewModifier {
     }
 }
 
+/// Text wrap width modifier — sets a maximum width for text word wrapping
+public struct TextWrapModifier: ViewModifier {
+    public let maxWidth: Float
+    public func apply(to node: LayoutNode) {
+        node.maxTextWidth = maxWidth
+    }
+}
+
+/// Disabled modifier — prevents interaction
+public struct DisabledModifier: ViewModifier {
+    public let isDisabled: Bool
+    public func apply(to node: LayoutNode) {
+        node.isDisabled = isDisabled
+        if isDisabled {
+            node.opacity = min(node.opacity, 0.5)
+        }
+    }
+}
+
+/// Shadow modifier — adds a shadow quad behind the node
+public struct ShadowModifier: ViewModifier {
+    public let color: Color
+    public let radius: Float
+    public let x: Float
+    public let y: Float
+    public func apply(to node: LayoutNode) {
+        node.shadowColor = color
+        node.shadowRadius = radius
+        node.shadowOffsetX = x
+        node.shadowOffsetY = y
+    }
+}
+
+/// Tap gesture modifier — adds a tap handler
+public struct OnTapGestureModifier: ViewModifier {
+    public let action: @Sendable () -> Void
+    public func apply(to node: LayoutNode) {
+        node.onTap = action
+    }
+}
+
+/// onAppear modifier — fires when the view first appears in the tree
+public struct OnAppearModifier: ViewModifier {
+    public let action: @Sendable () -> Void
+    public func apply(to node: LayoutNode) {
+        node.onAppear = action
+    }
+}
+
+/// onDisappear modifier — fires when the view is removed from the tree
+public struct OnDisappearModifier: ViewModifier {
+    public let action: @Sendable () -> Void
+    public func apply(to node: LayoutNode) {
+        node.onDisappear = action
+    }
+}
+
 // MARK: - View Extension Methods
 
 extension View {
@@ -180,6 +237,36 @@ extension View {
     /// Hide the view.
     public func hidden() -> ModifiedView<Self, HiddenModifier> {
         ModifiedView(content: self, modifier: HiddenModifier())
+    }
+
+    /// Set maximum text width for word wrapping.
+    public func textWrap(maxWidth: Float) -> ModifiedView<Self, TextWrapModifier> {
+        ModifiedView(content: self, modifier: TextWrapModifier(maxWidth: maxWidth))
+    }
+
+    /// Disable interaction on this view.
+    public func disabled(_ isDisabled: Bool = true) -> ModifiedView<Self, DisabledModifier> {
+        ModifiedView(content: self, modifier: DisabledModifier(isDisabled: isDisabled))
+    }
+
+    /// Add a shadow to the view.
+    public func shadow(color: Color = Color(0, 0, 0, 0.3), radius: Float = 4, x: Float = 0, y: Float = 2) -> ModifiedView<Self, ShadowModifier> {
+        ModifiedView(content: self, modifier: ShadowModifier(color: color, radius: radius, x: x, y: y))
+    }
+
+    /// Add a tap gesture handler.
+    public func onTapGesture(_ action: @escaping @Sendable () -> Void) -> ModifiedView<Self, OnTapGestureModifier> {
+        ModifiedView(content: self, modifier: OnTapGestureModifier(action: action))
+    }
+
+    /// Run an action when the view first appears.
+    public func onAppear(_ action: @escaping @Sendable () -> Void) -> ModifiedView<Self, OnAppearModifier> {
+        ModifiedView(content: self, modifier: OnAppearModifier(action: action))
+    }
+
+    /// Run an action when the view is removed.
+    public func onDisappear(_ action: @escaping @Sendable () -> Void) -> ModifiedView<Self, OnDisappearModifier> {
+        ModifiedView(content: self, modifier: OnDisappearModifier(action: action))
     }
 
     // MARK: - Accessibility Extensions

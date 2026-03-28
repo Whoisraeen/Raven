@@ -3,12 +3,36 @@ mod clipboard;
 mod file_dialog;
 
 use std::ffi::{c_char, CString};
+use std::cell::RefCell;
+
+thread_local! {
+    static LAST_ERROR: RefCell<Option<CString>> = RefCell::new(None);
+}
+
+fn set_last_error(msg: &str) {
+    LAST_ERROR.with(|e| {
+        *e.borrow_mut() = CString::new(msg).ok();
+    });
+}
 
 // MARK: - Core
 
 #[no_mangle]
 pub extern "C" fn raven_core_init() -> i32 {
+    set_last_error("");
     0
+}
+
+/// Returns the last error message, or null if no error.
+/// The returned pointer is valid until the next FFI call.
+#[no_mangle]
+pub extern "C" fn raven_core_last_error() -> *const c_char {
+    LAST_ERROR.with(|e| {
+        match &*e.borrow() {
+            Some(s) if !s.as_bytes().is_empty() => s.as_ptr(),
+            _ => std::ptr::null(),
+        }
+    })
 }
 
 #[no_mangle]

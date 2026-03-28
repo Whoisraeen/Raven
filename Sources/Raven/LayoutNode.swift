@@ -45,6 +45,15 @@ public class LayoutNode {
     /// Hidden — when true, node is not rendered
     public var isHidden: Bool = false
 
+    /// Disabled — when true, interaction is suppressed and opacity reduced
+    public var isDisabled: Bool = false
+
+    /// Shadow properties
+    public var shadowColor: Color? = nil
+    public var shadowRadius: Float = 0
+    public var shadowOffsetX: Float = 0
+    public var shadowOffsetY: Float = 0
+
     /// Text content (for Text nodes)
     public var text: String? = nil
 
@@ -76,8 +85,15 @@ public class LayoutNode {
     /// Event handlers
     public var onTap: (@Sendable () -> Void)? = nil
 
+    /// Lifecycle callbacks
+    public var onAppear: (@Sendable () -> Void)? = nil
+    public var onDisappear: (@Sendable () -> Void)? = nil
+
     /// Font size for text rendering
     public var fontSize: Float = 16.0
+
+    /// Maximum text width for word wrapping (nil = no wrapping)
+    public var maxTextWidth: Float? = nil
 
     /// Baseline offset from top of node (for text baseline alignment).
     /// For text nodes, this is the distance from the top to the text baseline.
@@ -197,7 +213,8 @@ public class LayoutNode {
     public var intrinsicHeight: Float {
         if let fh = fixedHeight { return fh }
         if let text = text {
-            let textSize = FontManager.shared.measureText(text, fontSize: fontSize)
+            let wrapWidth = maxTextWidth ?? 0
+            let textSize = FontManager.shared.measureText(text, fontSize: fontSize, maxWidth: wrapWidth)
             return textSize.height + padding.top + padding.bottom
         }
         switch stackAxis {

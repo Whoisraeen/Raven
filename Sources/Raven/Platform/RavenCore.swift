@@ -26,6 +26,12 @@ enum RavenCore {
         return str
     }
 
+    /// Returns the last error message from a Rust FFI call, or nil if no error.
+    static var lastError: String? {
+        guard let ptr = raven_core_last_error() else { return nil }
+        return String(cString: ptr)
+    }
+
     // MARK: - Clipboard
 
     /// Get the current clipboard text, or nil if empty/unavailable.

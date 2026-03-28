@@ -129,6 +129,30 @@ public struct QuadVertex {
     }
 }
 
+/// A clipping rectangle for scissor-based content clipping.
+public struct ClipRect: Equatable, Sendable {
+    public var x: Float
+    public var y: Float
+    public var width: Float
+    public var height: Float
+
+    public static let none = ClipRect(x: 0, y: 0, width: 0, height: 0)
+
+    public var isNone: Bool { width <= 0 || height <= 0 }
+
+    /// Intersect this clip rect with another, producing the overlapping region.
+    public func intersected(with other: ClipRect) -> ClipRect {
+        if other.isNone { return self }
+        if self.isNone { return other }
+        let x0 = max(self.x, other.x)
+        let y0 = max(self.y, other.y)
+        let x1 = min(self.x + self.width, other.x + other.width)
+        let y1 = min(self.y + self.height, other.y + other.height)
+        if x1 <= x0 || y1 <= y0 { return ClipRect(x: x0, y: y0, width: 0, height: 0) }
+        return ClipRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0)
+    }
+}
+
 public struct Quad {
     public var x: Float
     public var y: Float
@@ -139,7 +163,9 @@ public struct Quad {
     public var b: Float
     public var a: Float
 
-    public init(x: Float, y: Float, width: Float, height: Float, r: Float, g: Float, b: Float, a: Float = 1.0) {
+    public var clipRect: ClipRect = .none
+
+    public init(x: Float, y: Float, width: Float, height: Float, r: Float, g: Float, b: Float, a: Float = 1.0, clipRect: ClipRect = .none) {
         self.x = x
         self.y = y
         self.width = width
@@ -148,6 +174,7 @@ public struct Quad {
         self.g = g
         self.b = b
         self.a = a
+        self.clipRect = clipRect
     }
 
     /// Generate 6 vertices (2 triangles) for this quad

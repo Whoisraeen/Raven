@@ -138,6 +138,13 @@ public enum ViewResolver {
             return node
         }
 
+        // List
+        if let list = view as? AnyListView {
+            let node = list.resolveList(path: path)
+            node.id = path
+            return node
+        }
+
         // Divider
         if view is Divider {
             let theme = EnvironmentStore.shared.current.theme

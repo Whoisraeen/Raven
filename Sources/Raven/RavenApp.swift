@@ -13,6 +13,11 @@ public class RavenApp<Content: View>: @unchecked Sendable {
     private let height: Int
     private let contentBuilder: @Sendable () -> Content
 
+    /// Tracks node IDs from the previous frame for onAppear/onDisappear
+    private var previousNodeIDs: Set<AnyHashable> = []
+    /// Maps node IDs to their lifecycle callbacks
+    private var nodeCallbacks: [AnyHashable: (onAppear: (@Sendable () -> Void)?, onDisappear: (@Sendable () -> Void)?)] = [:]
+
     public init(
         title: String = "Raven App",
         width: Int = 960,
@@ -221,6 +226,9 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                     // Store for hit testing
                     rootNode = resolved
 
+                    // Process onAppear/onDisappear lifecycle callbacks
+                    processLifecycle(root: resolved)
+
                     // Build accessibility tree (available for screen readers / debugging)
                     let _ = AccessibilityCollector.collect(root: resolved)
 
@@ -250,6 +258,41 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         }
 
         print("Raven exited cleanly.")
+    }
+
+    /// Compare current node tree IDs with previous frame to fire onAppear/onDisappear.
+    private func processLifecycle(root: LayoutNode) {
+        var currentIDs = Set<AnyHashable>()
+        var currentCallbacks: [AnyHashable: (onAppear: (@Sendable () -> Void)?, onDisappear: (@Sendable () -> Void)?)] = [:]
+        collectLifecycleNodes(root, ids: &currentIDs, callbacks: &currentCallbacks)
+
+        // Fire onAppear for newly appeared nodes
+        for id in currentIDs {
+            if !previousNodeIDs.contains(id) {
+                currentCallbacks[id]?.onAppear?()
+            }
+        }
+
+        // Fire onDisappear for removed nodes
+        for id in previousNodeIDs {
+            if !currentIDs.contains(id) {
+                nodeCallbacks[id]?.onDisappear?()
+            }
+        }
+
+        previousNodeIDs = currentIDs
+        nodeCallbacks = currentCallbacks
+    }
+
+    private func collectLifecycleNodes(_ node: LayoutNode, ids: inout Set<AnyHashable>,
+                                       callbacks: inout [AnyHashable: (onAppear: (@Sendable () -> Void)?, onDisappear: (@Sendable () -> Void)?)]) {
+        if let id = node.id, (node.onAppear != nil || node.onDisappear != nil) {
+            ids.insert(id)
+            callbacks[id] = (onAppear: node.onAppear, onDisappear: node.onDisappear)
+        }
+        for child in node.children {
+            collectLifecycleNodes(child, ids: &ids, callbacks: &callbacks)
+        }
     }
 }
 

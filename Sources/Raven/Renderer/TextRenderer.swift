@@ -32,11 +32,13 @@ public struct TextDrawCommand {
     public var g: Float
     public var b: Float
     public var a: Float
+    public var maxWidth: Float
+    public var clipRect: ClipRect = .none
 
     public init(text: String, x: Float, y: Float, scale: Float = 1.0,
-                r: Float, g: Float, b: Float, a: Float = 1.0) {
+                r: Float, g: Float, b: Float, a: Float = 1.0, maxWidth: Float = 0, clipRect: ClipRect = .none) {
         self.text = text; self.x = x; self.y = y; self.scale = scale
-        self.r = r; self.g = g; self.b = b; self.a = a
+        self.r = r; self.g = g; self.b = b; self.a = a; self.maxWidth = maxWidth; self.clipRect = clipRect
     }
 }
 
@@ -514,14 +516,35 @@ public class TextRenderer {
 
         for cmd in commands {
             if useDynamicFont {
-                // Dynamic font path — proportional SDF glyphs
+                // Dynamic font path — proportional SDF glyphs with multi-line support
                 let fm = FontManager.shared
                 let fontSize = cmd.scale * 16.0  // base size 16, scaled
                 let metrics = fm.getMetrics(fontSize: fontSize)
                 var cursorX = cmd.x
+                var cursorY = cmd.y
                 var prevCodepoint: UInt32 = 0
+                let startX = cmd.x
+                let maxWidth = cmd.maxWidth
+
+                // Word-wrap state: buffer glyphs for the current word
+                var wordGlyphs: [(cp: UInt32, glyph: GlyphInfo, x: Float)] = []
+                var wordStartX = cursorX
 
                 for char in cmd.text {
+                    // Handle explicit newlines
+                    if char == "\n" {
+                        // Flush word buffer
+                        for wg in wordGlyphs {
+                            emitGlyph(wg.glyph, x: wg.x, y: cursorY, ascent: metrics.ascent, cmd: cmd, into: &vertices)
+                        }
+                        wordGlyphs.removeAll(keepingCapacity: true)
+                        cursorX = startX
+                        cursorY += metrics.lineHeight
+                        prevCodepoint = 0
+                        wordStartX = cursorX
+                        continue
+                    }
+
                     let cp = char.unicodeScalars.first.map { UInt32($0.value) } ?? 32
 
                     // Apply kerning
@@ -534,24 +557,41 @@ public class TextRenderer {
                         continue
                     }
 
-                    if glyph.width > 0 && glyph.height > 0 {
-                        let x0 = cursorX + glyph.xOffset
-                        let y0 = cmd.y + metrics.ascent + glyph.yOffset
-                        let x1 = x0 + glyph.width
-                        let y1 = y0 + glyph.height
-
-                        // Two triangles per glyph
-                        vertices.append(TextVertex(x0, y0, glyph.u0, glyph.v0, cmd.r, cmd.g, cmd.b, cmd.a))
-                        vertices.append(TextVertex(x0, y1, glyph.u0, glyph.v1, cmd.r, cmd.g, cmd.b, cmd.a))
-                        vertices.append(TextVertex(x1, y1, glyph.u1, glyph.v1, cmd.r, cmd.g, cmd.b, cmd.a))
-
-                        vertices.append(TextVertex(x0, y0, glyph.u0, glyph.v0, cmd.r, cmd.g, cmd.b, cmd.a))
-                        vertices.append(TextVertex(x1, y1, glyph.u1, glyph.v1, cmd.r, cmd.g, cmd.b, cmd.a))
-                        vertices.append(TextVertex(x1, y0, glyph.u1, glyph.v0, cmd.r, cmd.g, cmd.b, cmd.a))
+                    if char == " " {
+                        // Space: flush word buffer and advance
+                        for wg in wordGlyphs {
+                            emitGlyph(wg.glyph, x: wg.x, y: cursorY, ascent: metrics.ascent, cmd: cmd, into: &vertices)
+                        }
+                        wordGlyphs.removeAll(keepingCapacity: true)
+                        cursorX += glyph.advance
+                        wordStartX = cursorX
+                    } else {
+                        // Non-space: check word wrap before adding
+                        if maxWidth > 0 && cursorX + glyph.advance - startX > maxWidth && cursorX > startX {
+                            // Wrap: move to next line, re-emit word from line start
+                            cursorX = startX
+                            cursorY += metrics.lineHeight
+                            // Re-position word glyphs on the new line
+                            var newX = startX
+                            for i in wordGlyphs.indices {
+                                wordGlyphs[i].x = newX
+                                if let g = fm.getGlyph(codepoint: wordGlyphs[i].cp, fontSize: fontSize) {
+                                    newX += g.advance
+                                }
+                            }
+                            cursorX = newX
+                            wordStartX = startX
+                        }
+                        wordGlyphs.append((cp: cp, glyph: glyph, x: cursorX))
+                        cursorX += glyph.advance
                     }
 
-                    cursorX += glyph.advance
                     prevCodepoint = cp
+                }
+
+                // Flush remaining word
+                for wg in wordGlyphs {
+                    emitGlyph(wg.glyph, x: wg.x, y: cursorY, ascent: metrics.ascent, cmd: cmd, into: &vertices)
                 }
             } else {
                 // Fallback: hardcoded bitmap FontAtlas
@@ -581,6 +621,23 @@ public class TextRenderer {
         }
 
         return vertices
+    }
+
+    /// Emit two triangles for a single glyph at the given position.
+    private func emitGlyph(_ glyph: GlyphInfo, x: Float, y: Float, ascent: Float, cmd: TextDrawCommand, into vertices: inout [TextVertex]) {
+        guard glyph.width > 0 && glyph.height > 0 else { return }
+        let x0 = x + glyph.xOffset
+        let y0 = y + ascent + glyph.yOffset
+        let x1 = x0 + glyph.width
+        let y1 = y0 + glyph.height
+
+        vertices.append(TextVertex(x0, y0, glyph.u0, glyph.v0, cmd.r, cmd.g, cmd.b, cmd.a))
+        vertices.append(TextVertex(x0, y1, glyph.u0, glyph.v1, cmd.r, cmd.g, cmd.b, cmd.a))
+        vertices.append(TextVertex(x1, y1, glyph.u1, glyph.v1, cmd.r, cmd.g, cmd.b, cmd.a))
+
+        vertices.append(TextVertex(x0, y0, glyph.u0, glyph.v0, cmd.r, cmd.g, cmd.b, cmd.a))
+        vertices.append(TextVertex(x1, y1, glyph.u1, glyph.v1, cmd.r, cmd.g, cmd.b, cmd.a))
+        vertices.append(TextVertex(x1, y0, glyph.u1, glyph.v0, cmd.r, cmd.g, cmd.b, cmd.a))
     }
 
     /// Re-upload the atlas texture if FontManager has new glyphs.
