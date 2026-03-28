@@ -1,6 +1,6 @@
 # RAVEN — Project Documentation
 **A Swift-Based Cross-Platform Native UI Framework**
-**Version 1.0 | Confidential**
+**Version 2.0 | March 2026**
 
 ---
 
@@ -23,7 +23,7 @@ Every developer who has tried to build a cross-platform desktop application has 
 
 The result is that professional developers who care about quality are forced to choose between:
 
-**A.** Ship something that works everywhere but feels like garbage everywhere  
+**A.** Ship something that works everywhere but feels like garbage everywhere
 **B.** Write separate native apps for each platform and maintain three codebases
 
 Nobody has solved this. Raven solves this.
@@ -49,211 +49,513 @@ Raven is a UI framework where developers write Swift once and ship natively on W
 ### The Stack
 
 ```
-┌─────────────────────────────────────────────┐
-│           DEVELOPER'S SWIFT CODE            │
-│       (Raven's declarative Swift API)       │
-├─────────────────────────────────────────────┤
-│             LAYOUT ENGINE                   │
-│     Flexbox-style, written in Swift         │
-│   (Handles sizing, spacing, constraints)    │
-├─────────────────────────────────────────────┤
-│          UI COMPONENT LIBRARY               │
-│  Buttons, text, inputs, lists, modals,      │
-│  navigation, gestures — all Swift           │
-├─────────────────────────────────────────────┤
-│               RENDERER                      │
-│   Vulkan → Windows and Linux                │
-│   Vulkan via MoltenVK → macOS               │
-│   (Pixel-identical output on all platforms) │
-├─────────────────────────────────────────────┤
-│            PLATFORM LAYER                   │
-│   SDL3 — window creation, input, events     │
-│   Per-platform system API wrappers          │
-│   (Hidden entirely from the developer)      │
-├─────────────────────────────────────────────┤
-│         SWIFT + RUST FOUNDATION             │
-│   Swift — framework API and UI logic        │
-│   Rust — performance-critical renderer core │
-│           and platform bridge               │
-└─────────────────────────────────────────────┘
++---------------------------------------------+
+|           DEVELOPER'S SWIFT CODE             |
+|       (Raven's declarative Swift API)        |
++---------------------------------------------+
+|             LAYOUT ENGINE                    |
+|     Flexbox-style, written in Swift          |
+|   (Sizing, spacing, constraints, caching)    |
++---------------------------------------------+
+|          UI COMPONENT LIBRARY                |
+|  Text, Button, TextField, ScrollView,        |
+|  Stacks, Navigation, Sidebar, Sheet          |
++---------------------------------------------+
+|            ANIMATION ENGINE                  |
+|   Spring physics, easing curves, layout      |
+|   transitions, callback-based interpolation  |
++---------------------------------------------+
+|     ENVIRONMENT + THEME + STATE ENGINE       |
+|   @State, @Binding, @Environment, themes,    |
+|   dirty tracking, path-based identity        |
++---------------------------------------------+
+|               RENDERER                       |
+|   Vulkan 1.4 — quad, text (SDF), image       |
+|   pipelines with per-frame vertex buffers    |
++---------------------------------------------+
+|            PLATFORM LAYER                    |
+|   SDL3 — window creation, input, events      |
+|   Rust FFI — clipboard, file dialogs         |
++---------------------------------------------+
+|         SWIFT + RUST FOUNDATION              |
+|   Swift — framework API and UI logic         |
+|   Rust — platform bridge via C FFI           |
++---------------------------------------------+
 ```
 
 ### Language Responsibilities
 
 **Swift**
 - The entire developer-facing API
-- Layout engine
+- Layout engine (two-pass: measure + layout)
 - Component library
-- State management
-- Animation system
+- State management (@State, @Binding, StateVar, @Published)
+- Animation system (spring physics, easing, callback animations)
+- Environment and theme system
+- View resolution and modifier chains
 - Application logic layer
 
 **Rust**
-- The Vulkan renderer core — performance-critical, memory-safe
-- Platform bridge — interfacing with Windows APIs, Linux APIs, macOS APIs
-- The FFI layer between Swift and low-level system calls
-- Build toolchain utilities
+- Platform bridge — clipboard, file dialogs (Win32/osascript/zenity)
+- Platform detection and OS version reporting
+- C FFI exports consumed by Swift via CRavenCore module
 
 **Why both:**
-Swift gives developers a modern, expressive, type-safe API that feels familiar to anyone who has used SwiftUI. Rust handles the parts where memory safety and raw performance are non-negotiable — the renderer and system layer. The two languages interoperate cleanly via C FFI.
+Swift gives developers a modern, expressive, type-safe API that feels familiar to anyone who has used SwiftUI. Rust handles platform-specific system integration where each OS has completely different APIs. The two languages interoperate cleanly via C FFI with a hand-maintained header.
 
 ### Renderer Details
 
-**Primary: Vulkan**
+**Primary: Vulkan 1.4**
 - Runs natively on Windows and Linux
-- Industry standard for modern cross-platform GPU work
-- Full control over the rendering pipeline
-- Enables custom visual effects, animations, and blur at the framework level
+- Three separate render pipelines: quads (colored rectangles), text (SDF), images (textured quads)
+- Per-frame vertex buffer management with dynamic resizing
+- Swapchain recreation on window resize
 
-**macOS: MoltenVK**
-- MoltenVK translates Vulkan API calls to Apple's Metal API
-- Already production-proven — used by major game engines
-- Means the renderer codebase is unified — no Metal-specific renderer to maintain
-- Performance overhead is minimal and acceptable
+**macOS: MoltenVK** (planned)
+- VK_KHR_portability_enumeration and VK_KHR_portability_subset extensions ready in code
+- Package.swift has macOS conditional paths
 
 **Window Management and Input: SDL3**
-- Handles window creation, destruction, and resizing on all three platforms
-- Handles keyboard, mouse, touch, and gamepad input
-- Battle-tested, MIT licensed, actively maintained
-- Abstracts the platform differences so Raven's platform layer stays thin
-
-### What Raven Builds
-
-The five components that don't exist and must be written:
-
-**1. Layout Engine**
-- Flexbox-style constraint system written in Swift
-- Handles element sizing, spacing, padding, alignment
-- Responsive to window resizing
-- Supports both declarative and imperative layout patterns
-
-**2. Component Library**
-- Every standard UI element a developer needs
-- Text, buttons, inputs, checkboxes, toggles, sliders, dropdowns
-- Lists, tables, grids, scroll views
-- Navigation patterns — sidebars, tab bars, modal sheets
-- All styled consistently, all customizable via a theming system
-
-**3. Renderer**
-- Takes the layout engine's output (a tree of positioned elements)
-- Translates it into Vulkan draw calls
-- Handles text rendering via a signed distance field font system
-- Handles images, SVG, and vector graphics
-- Handles animations and transitions at the GPU level
-
-**4. Platform Layer**
-- Thin Swift/Rust wrappers around each platform's system APIs
-- File system access
-- System notifications
-- Clipboard
-- Drag and drop
-- System tray / menu bar
-- OS-level dark mode and accent color detection
-
-**5. Developer API**
-- The public-facing Swift API that developers actually write against
-- Declarative, SwiftUI-inspired syntax
-- State management built in — no third party store required
-- Hot reload during development
-- Clear, well-documented, opinionated where it helps and flexible where it matters
+- Handles window creation, destruction, and resizing
+- Handles keyboard, mouse, scroll wheel input
+- SDL_Vulkan_CreateSurface for Vulkan surface creation
 
 ---
 
-## 5. What Already Exists (Don't Rebuild These)
+## 5. Current Implementation Status
 
-| Component | Solution | Status |
-|---|---|---|
-| Swift on Windows/Linux | Swift open source toolchain | Production ready |
-| Vulkan on macOS | MoltenVK | Production ready |
-| Window creation + input | SDL3 | Production ready |
-| Swift/Rust interop | C FFI bridge | Standard practice |
-| Text rendering | SDF font rendering via Vulkan | Well documented |
-| Swift package manager | SPM | Built into Swift |
+### What Works (Verified, Building, Tested on Windows)
+
+| Module | Status | Notes |
+|--------|--------|-------|
+| Vulkan renderer (quad/text/image pipelines) | Done | Stable, handles swapchain recreation |
+| SDF text rendering (TrueType via stb_truetype) | Done | Single font, single size (16px base) |
+| Image rendering (PNG/JPG/BMP via stb_image) | Done | Loaded into Vulkan textures |
+| VStack / HStack / ZStack | Done | Full flex layout with alignment |
+| FlowStack (flex-wrap) | Done | Horizontal wrapping layout |
+| Baseline alignment | Done | HStack children align on text baseline |
+| Text, Button, Spacer, Image | Done | Core primitives |
+| TextField (text input) | Done | Basic input with focus management |
+| ScrollView (vertical/horizontal) | Done | Scroll offset applied in layout engine |
+| @State / @Binding / StateVar / @Published | Done | Path-based dirty tracking |
+| @Environment / EnvironmentValues | Done | Stack-based scoped propagation |
+| Theme system (light/dark, 20 tokens) | Done | Environment-based, components read from theme |
+| NavigationStack (push/pop) | Done | Route-based view switching |
+| Sidebar (two-pane layout) | Done | Fixed sidebar + flexible detail |
+| Sheet (modal overlay) | Done | Binding-controlled with backdrop dismiss |
+| Animation (spring, easeIn/Out/InOut, linear) | Done | Property-based + callback-based |
+| withAnimation block API | Done | Sets animation context for state changes |
+| Layout transition animations | Done | Path-based identity for continuity |
+| Intrinsic size caching | Done | Lazy compute, avoids redundant measureText |
+| Clipboard (get/set) | Done | Win32 API / pbcopy / xclip via Rust |
+| File dialogs (open/save/folder) | Done | PowerShell / osascript / zenity via Rust |
+| Raven CLI (build/run/dev/clean) | Done | Bash script + npm package (swift-raven) |
+| Accessibility tree collection | Done | Semantic roles, labels, values |
+| ViewBuilder with Parameter Packs | Done | Unlimited children via TupleView |
+
+### What Does NOT Work Yet
+
+| Feature | Status | Blocking Issue |
+|---------|--------|----------------|
+| macOS builds | Not started | MoltenVK integration incomplete |
+| Linux builds | Not tested | Package.swift paths need validation |
+| Multi-line text / text wrapping | Missing | TextRenderer has no line-wrap logic |
+| Font size control | Missing | Hardcoded 16px, no .font() modifier |
+| ScrollView content clipping | Missing | No per-element scissor rects in renderer |
+| ForEach | Missing | Cannot iterate dynamic collections |
+| List component | Missing | No list/table for scrollable item collections |
+| Divider | Missing | No visual separator |
+| Toggle / Slider / Picker | Missing | No form input components |
+| ProgressView | Missing | No progress indicator |
+| Alert / Menu / TabView | Missing | No system-level UI patterns |
+| opacity / shadow / border modifiers | Missing | LayoutNode has properties but no modifiers |
+| onAppear / onDisappear | Missing | No lifecycle callbacks |
+| disabled / hidden modifiers | Missing | No interaction state control |
+| Keyboard navigation | Missing | Only TextField has focus, no Tab nav |
+| Hot reload | Missing | raven dev watches files but does full restart |
+| Cross-compilation | Not started | Build only on host platform |
+| SVG / vector graphics | Not started | Only raster images supported |
 
 ---
 
-## 6. Developer Experience
+## 6. Known Issues and Technical Debt
 
-### What Writing a Raven App Looks Like
+### Critical (Will break or cause incorrect behavior)
+
+1. **Font atlas UV bug** — FontManager atlas growth recalculates UVs incorrectly (`u0 * Float(atlasWidth / 2) / Float(atlasWidth)` should be `u0 * 0.5`). Glyphs render wrong after atlas resize.
+
+2. **LayoutNode.previousPositions grows unbounded** — Static dictionary never pruned. Every animated node ID persists forever. Memory leak proportional to app lifetime.
+
+3. **Spring physics instability** — Small `response` values (< 0.01) cause huge stiffness, numerical overflow. `dampingFraction > 1.0` causes `sqrt(negative)` = NaN in underdamped branch.
+
+4. **Division by zero in animation** — `easeIn`/`easeOut`/`easeInOut`/`linear` with `duration: 0` causes `elapsed / 0` = NaN.
+
+5. **LayoutNode.intrinsicWidth uses hardcoded fontSize 16.0** — Text measurement ignores the node's actual `fontSize` property, producing wrong intrinsic sizes for non-default font sizes.
+
+6. **`raven init` generates wrong dependency URL** — Creates `https://github.com/raven-ui/raven.git` instead of `https://github.com/Whoisraeen/Raven.git`. Generated projects cannot build.
+
+### High Priority (Significant gaps)
+
+7. **No ScrollView clipping** — Content renders outside scroll bounds. Vulkan scissor rects exist per-frame but not per-element. Nested ScrollViews will overlap.
+
+8. **No multi-line text** — TextRenderer processes characters left-to-right without wrapping. No newline handling. FontManager.measureText doesn't split on `\n`.
+
+9. **Thread safety across all singletons** — `StateTracker.shared`, `AnimationEngine.shared`, `EnvironmentStore.shared`, `FontManager.shared`, `FocusManager.shared` all have mutable state without synchronization. Currently safe because single-threaded, but will break if any async work is introduced.
+
+10. **Vulkan error handling gaps** — Multiple Vulkan calls don't check VkResult: `vkAllocateCommandBuffers`, `vkMapMemory`, `vkGetBufferMemoryRequirements`. Failed allocations produce garbage handles.
+
+11. **Resource leaks in Vulkan setup** — If `vkCreateImage` succeeds but `vkAllocateMemory` fails, the image handle leaks. Same pattern in buffer creation. No cleanup-on-failure paths.
+
+12. **Retain cycles in closures** — Sheet backdrop `onTap` captures Binding that may capture the Sheet view. SidebarItem `onTap` similarly. `AnimationInstance` holds strong LayoutNode reference during animation.
+
+13. **SDL_strdup memory leaks** — `SDL_strdup("main")` in pipeline creation, `SDL_strdup("VK_KHR_portability_subset")` — allocated but never freed.
+
+### Medium Priority (Quality and completeness)
+
+14. **No `ForEach` or `buildArray`** — Cannot render dynamic collections. ViewBuilder only supports static view composition.
+
+15. **Hardcoded component styling** — Button cornerRadius=6, TextField fixedWidth=200, Sheet cornerRadius=12, SidebarItem padding, all baked into ViewResolver rather than configurable via modifiers or theme.
+
+16. **Version scattered across 5 files** — `Cargo.toml`, `cli/package.json`, `raven` script, `raven.js`, and Rust lib all declare "0.1.0" independently. No single source of truth.
+
+17. **Windows-only SDL3/Vulkan paths** — Package.swift hardcodes `vendor/SDL3/SDL3-3.4.2/lib/x64` (no ARM64) and `C:/VulkanSDK/1.4.341.1/` (version-specific). Linux assumes `/usr/lib`.
+
+18. **Per-frame vertex buffer recreation** — Quad, text, and image renderers reallocate vertex buffers when size changes. No growth factor strategy; allocates exact size needed every time.
+
+19. **No pipeline cache** — Vulkan pipelines recreated from scratch on every app launch. No `VkPipelineCache` for startup optimization.
+
+20. **Missing Vulkan validation layer integration** — No debug messenger for catching Vulkan misuse during development.
+
+---
+
+## 7. Architecture Deep Dive
+
+### View Resolution Pipeline
+
+```
+Developer's View struct
+        |
+        v
+ViewResolver.resolve()
+  - Mirror reflection to inject @Environment
+  - Type-check against known primitives (Text, Button, etc.)
+  - If primitive: create LayoutNode directly
+  - If composite: recurse into view.body
+  - If ModifiedView: resolve content, apply modifier
+  - If TupleView: resolve each child with indexed path
+  - If ConditionalView: resolve active branch
+        |
+        v
+LayoutNode tree (with IDs, properties, event handlers)
+        |
+        v
+LayoutEngine.resolve()
+  - Root fills viewport
+  - Recursive layoutChildren():
+    - VStack: top-to-bottom, flex distribution
+    - HStack: left-to-right, flex distribution
+    - ZStack: centered overlay
+    - FlexWrap: left-to-right with line breaks
+    - ScrollView: offset content origin
+        |
+        v
+RenderCollector.collect()
+  - Walk tree, emit Quads (backgrounds)
+  - Emit TextDrawCommands (text nodes)
+  - Emit ImageDrawCommands (image nodes)
+        |
+        v
+VulkanRenderer.drawFrame()
+  - Record quad vertices -> quad pipeline
+  - Record text vertices -> text pipeline (SDF)
+  - Record image vertices -> image pipeline
+  - Submit command buffer, present swapchain
+```
+
+### State Change Flow
+
+```
+User interaction (click, type, scroll)
+        |
+        v
+Event handler mutates StateVar/State
+        |
+        v
+StateTracker.markDirty(path:)
+  - Sets dirty flag + records changed path
+        |
+        v
+Main loop checks StateTracker.checkAndClear()
+  - Returns dirty paths, resets flag
+        |
+        v
+Snapshot previous positions (for animation)
+        |
+        v
+Full view tree rebuild
+  - contentBuilder() re-evaluated
+  - ViewResolver resolves entire tree
+  - LayoutEngine assigns positions/sizes
+        |
+        v
+RenderCollector produces new draw commands
+        |
+        v
+Renderer draws frame with new data
+```
+
+### Animation Flow
+
+```
+withAnimation(.spring(...)) {
+    someState.value = newValue
+}
+        |
+        v
+AnimationEngine.currentAnimation set to .spring(...)
+        |
+        v
+State setter calls markDirty()
+        |
+        v
+View tree rebuilds with new values
+        |
+        v
+LayoutNode.x/y/opacity didSet triggers animate()
+  - Checks AnimationEngine.currentAnimation
+  - If set: creates AnimationInstance (node + property + start/end + curve)
+  - Adds to AnimationEngine.activeAnimations
+        |
+        v
+AnimationEngine.currentAnimation cleared
+        |
+        v
+Each frame: AnimationEngine.tick(deltaTime:)
+  - Updates elapsed time on each AnimationInstance
+  - Interpolates value using curve (spring/easing)
+  - Applies to node property
+  - Marks state dirty to trigger re-render
+  - Removes completed animations
+```
+
+---
+
+## 8. Module Map
+
+| Module | Files | Responsibility |
+|--------|-------|----------------|
+| **Core** | `Raven.swift`, `RavenApp.swift`, `Types.swift` | App lifecycle, event loop, core types |
+| **View System** | `View.swift`, `ViewBuilder.swift`, `ViewModifiers.swift`, `ViewResolver.swift` | Declarative DSL, parameter packs, modifier chains, view-to-node resolution |
+| **State** | `State.swift` | `@State`, `@Binding`, `StateVar`, `@Published`, `StateTracker` |
+| **Layout** | `LayoutEngine.swift`, `LayoutNode.swift` | Two-pass layout (measure + position), intrinsic size caching |
+| **Animation** | `Animation.swift` | `AnimationEngine`, spring/easing physics, `withAnimation`, callback animations |
+| **Environment** | `Environment.swift` | `@Environment`, `EnvironmentKey`, `EnvironmentValues`, `EnvironmentStore` |
+| **Theme** | `Theme.swift` | 20 semantic color tokens, light/dark presets, `ThemeKey` |
+| **Components** | `Components/` directory | `Text`, `Button`, `Spacer`, `Image`, `TextField`, `ScrollView`, `Stacks`, `FlowStack` |
+| **Navigation** | `NavigationStack.swift`, `Sidebar.swift`, `Sheet.swift` | Stack nav, two-pane layout, modal overlay |
+| **Renderer** | `Renderer/` directory | `VulkanRenderer`, `VulkanPipeline`, `VulkanBuffer`, `TextRenderer`, `ImageRenderer`, `FontManager`, `VulkanHelpers` |
+| **Render Bridge** | `RenderCollector.swift` | Walks LayoutNode tree, produces draw command arrays |
+| **Events** | `EventDispatcher.swift` | Hit testing, click dispatch, focus management |
+| **Accessibility** | `Accessibility.swift`, `AccessibilityCollector.swift` | Semantic roles, tree collection |
+| **Platform** | `Platform/RavenCore.swift` | Swift wrapper for Rust FFI (clipboard, file dialogs) |
+| **Rust Core** | `rust/raven-core/` | Platform detection, clipboard (Win32/pbcopy/xclip), file dialogs (PowerShell/osascript/zenity) |
+| **C Modules** | `CRavenCore/`, `CSDL3/`, `CVulkan/` | Module maps for Rust FFI, SDL3, Vulkan headers |
+| **CLI** | `raven`, `raven.bat`, `cli/` | Build orchestration (Rust+Swift), dev mode, npm package |
+
+---
+
+## 9. Phased Development Roadmap
+
+### Phase 1 — Foundation (COMPLETE)
+- [x] Swift toolchain on Windows
+- [x] SDL3 + Vulkan initialization
+- [x] Basic text rendering (SDF via stb_truetype)
+- [x] Basic layout (VStack/HStack/ZStack)
+- [x] Primitive components (Text, Button, Spacer)
+- [x] Swift/Rust FFI bridge (C FFI, static library)
+
+### Phase 2 — Core Framework (COMPLETE)
+- [x] Full layout engine (padding, alignment, flex, intrinsic caching)
+- [x] Image component (texture loading via stb_image)
+- [x] TextField (text input with focus management)
+- [x] ScrollView (vertical/horizontal with scroll offset)
+- [x] Animation system (spring physics, easing curves, withAnimation)
+- [x] State management (@State, @Binding, StateVar, @Published, dirty tracking)
+- [x] Environment system (@Environment, EnvironmentKey, scoped propagation)
+- [x] Theme system (light/dark, 20 semantic tokens)
+- [x] Navigation (NavigationStack, Sidebar, SidebarItem, Sheet)
+- [x] Platform layer (clipboard, file dialogs via Rust)
+- [x] FlowStack (flex-wrap) + baseline alignment
+- [x] Raven CLI (build/run/dev/clean/version)
+- [x] npm package published (swift-raven)
+
+### Phase 3 — Hardening and Completeness (CURRENT)
+**Goal: Fix all critical bugs, add missing essentials, ship on macOS**
+
+#### Critical Fixes
+- [ ] Fix font atlas UV recalculation on growth
+- [ ] Fix LayoutNode.previousPositions memory leak (prune per frame)
+- [ ] Fix spring physics NaN/overflow for edge case parameters
+- [ ] Guard against zero-duration animations
+- [ ] Fix text measurement to use actual fontSize
+- [ ] Fix `raven init` dependency URL
+- [ ] Add Vulkan error checking on all vkAllocate/vkCreate calls
+- [ ] Fix resource leaks on Vulkan allocation failures
+- [ ] Free SDL_strdup allocations
+
+#### Essential Features
+- [ ] ScrollView content clipping (per-element scissor rects)
+- [ ] Multi-line text rendering (word wrap, newline support)
+- [ ] Font size support (.font() modifier, variable fontSize in TextRenderer)
+- [ ] ForEach component for dynamic collections
+- [ ] List component (scrollable item collection)
+- [ ] Divider component
+- [ ] opacity, border, shadow, hidden, disabled modifiers
+- [ ] onAppear / onDisappear lifecycle callbacks
+
+#### Platform
+- [ ] macOS builds via MoltenVK
+- [ ] Linux build verification
+- [ ] Cross-platform path handling in Package.swift (env vars, pkg-config)
+
+### Phase 4 — Developer Experience (NEXT)
+**Goal: Good enough that a developer chooses Raven over Tauri for a real project**
+
+- [ ] Hot reload with state preservation
+- [ ] Toggle, Slider, Picker, ProgressView components
+- [ ] Alert, Menu, TabView components
+- [ ] Keyboard navigation (Tab, Enter, Space)
+- [ ] Screen reader integration
+- [ ] System tray / menu bar integration
+- [ ] OS dark mode detection
+- [ ] Drag and drop
+- [ ] Cross-compilation
+- [ ] Performance profiler
+- [ ] Pipeline cache for faster startup
+- [ ] Vertex buffer growth strategy (reduce per-frame allocations)
+
+### Phase 5 — Pro and Ecosystem (Year 2)
+- [ ] Raven Studio — visual editor
+- [ ] Advanced component library (data grids, rich text, charts)
+- [ ] Enterprise licensing and support
+- [ ] Conference talks and developer marketing
+
+---
+
+## 10. What Writing a Raven App Looks Like (Actual API)
 
 ```swift
 import Raven
 
-@RavenApp
-struct MyApp: App {
-    var body: some Scene {
-        Window("My Application", size: .init(800, 600)) {
-            ContentView()
-        }
-    }
-}
+let selectedTab = StateVar("home")
+let count = StateVar(0)
+let showSheet = StateVar(false)
 
-struct ContentView: View {
-    @State private var count = 0
+let app = RavenApp(title: "My App", width: 1024, height: 680) {
+    Sidebar(width: 200) {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("My App")
+                .foreground(.white)
+                .padding(16)
 
-    var body: some View {
-        VStack(spacing: 16) {
-            Text("Count: \(count)")
-                .font(.title)
-                .foreground(.primary)
-
-            Button("Increment") {
-                count += 1
+            SidebarItem(label: "Home", isSelected: selectedTab.value == "home") {
+                selectedTab.value = "home"
             }
-            .style(.filled)
+            SidebarItem(label: "Settings", isSelected: selectedTab.value == "settings") {
+                selectedTab.value = "settings"
+            }
+
+            Spacer()
+        }
+    } detail: {
+        VStack(spacing: 16) {
+            Text("Count: \(count.value)")
+                .foreground(.white)
+
+            HStack(spacing: 12) {
+                Button("Increment") {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        count.value += 1
+                    }
+                }
+
+                Button("Open Sheet") {
+                    showSheet.value = true
+                }
+            }
+
+            Spacer()
         }
         .padding(24)
     }
+
+    Sheet(isPresented: showSheet.binding, width: 400, height: 250) {
+        VStack(spacing: 16) {
+            Text("Modal Content").foreground(.white)
+            Button("Close") { showSheet.value = false }
+        }
+    }
 }
+
+app.run()
 ```
 
-**The goal:** Any SwiftUI developer looks at this and feels at home within minutes. The learning curve is minimal. The mental model transfers directly.
+### CLI Tooling
 
-### Tooling
+```bash
+# Install
+npm install -g swift-raven
 
-- **Raven CLI** — `raven new`, `raven build`, `raven run`, `raven package`
-- **Hot reload** — UI changes reflect instantly during development without restarting
-- **Cross-compile from any platform** — build a Windows app from macOS, build a Linux app from Windows
-- **Single binary output** — the shipped app is one self-contained executable with no external runtime dependencies
+# Check prerequisites
+raven doctor
+
+# Build (Rust + Swift)
+raven build
+
+# Build and run
+raven run
+
+# Dev mode (watch for changes, auto-rebuild)
+raven dev
+
+# Create new project
+raven init my-app
+
+# Clean build artifacts
+raven clean
+```
 
 ---
 
-## 7. Competitive Positioning
+## 11. Competitive Positioning
 
 | Framework | Language | Native Feel | Same UI Everywhere | No WebView | Cross Compile | Desktop First |
 |---|---|---|---|---|---|---|
-| Electron | JS/HTML/CSS | ✗ | ✓ | ✗ | ✓ | ✗ |
-| Tauri | Rust + WebView | ✗ | ✓ | ✗ | ✓ | ✗ |
-| Flutter | Dart | Partial | ✓ | ✓ | ✓ | ✗ |
-| Qt | C++ | ✓ | Partial | ✓ | ✓ | ✓ |
-| SwiftUI | Swift | ✓ | ✗ | ✓ | ✗ | ✗ |
-| .NET MAUI | C# | Partial | ✗ | ✓ | Partial | ✗ |
-| **Raven** | **Swift** | **✓** | **✓** | **✓** | **✓** | **✓** |
-
-Raven is the only framework in this table that checks every box.
+| Electron | JS/HTML/CSS | No | Yes | No | Yes | No |
+| Tauri | Rust + WebView | No | Yes | No | Yes | No |
+| Flutter | Dart | Partial | Yes | Yes | Yes | No |
+| Qt | C++ | Yes | Partial | Yes | Yes | Yes |
+| SwiftUI | Swift | Yes | No | Yes | No | No |
+| .NET MAUI | C# | Partial | No | Yes | Partial | No |
+| **Raven** | **Swift** | **Yes** | **Yes** | **Yes** | **Planned** | **Yes** |
 
 ---
 
-## 8. Target Audience
+## 12. Target Audience
 
 **Primary: Professional and Enterprise Developers**
-
-- Teams building internal tooling who need it to run on mixed Windows/Mac environments
-- Independent software vendors building professional desktop tools — database clients, developer tools, creative software
-- Developers coming from Apple's ecosystem who want to ship on Windows and Linux without learning a new language
-- Teams currently maintaining separate native codebases per platform looking to consolidate
+- Teams building internal tooling for mixed Windows/Mac environments
+- ISVs building professional desktop tools
+- Developers from Apple's ecosystem who want Windows/Linux reach
+- Teams maintaining separate native codebases looking to consolidate
 
 **Secondary: Indie Developers and Solo Builders**
-
-- Solo developers who want native quality without the overhead of three separate codebases
-- The developer community that has been burned by Electron and Tauri and is actively looking for something better
-
-**The Psychographic:**
-This is the developer who refused to ship an Electron app because it felt wrong, who tried Tauri and felt the WebView ceiling, who looked at Flutter and didn't want to learn Dart, who knows SwiftUI and loves it but can't use it on Windows. This person exists in large numbers and they are vocal about their frustration.
+- Solo developers wanting native quality without three codebases
+- Developers burned by Electron/Tauri looking for something genuinely better
 
 ---
 
-## 9. Monetization
+## 13. Monetization
 
 ### Model: Open Source Core + Paid Pro
 
@@ -262,149 +564,45 @@ This is the developer who refused to ship an Electron app because it felt wrong,
 - CLI tooling
 - Standard component library
 - Community support
-- Unlimited personal and commercial use
 
-**Raven Pro — Paid License (Per Developer / Team)**
-- **Advanced component library** — data grids, rich text editors, chart components, complex navigation patterns
-- **Raven Studio** — visual layout editor and design tool for building Raven UIs
-- **Priority support** — guaranteed response times, direct access to core team
-- **Hot reload advanced** — full state-preserving hot reload across the entire app
-- **Performance profiler** — built-in tooling to identify layout and render bottlenecks
-- **Early access** to new platform targets and experimental features
-
-**Enterprise License**
-- Custom pricing for large teams
-- SLA support agreements
-- Private Slack/Discord channel with core team
-- Onboarding and consulting hours
-
-### Why This Model Works
-- Open source drives adoption — developers try it for free, love it, advocate for it
-- Pro features target the pain points that professional teams hit at scale
-- Enterprise licensing captures the high-value customers who need guarantees
-- The framework becoming a standard means the Pro tooling sells itself
-- No per-app royalties — developers hate royalty models (see: Unity's pricing disaster)
+**Raven Pro — Paid License**
+- Advanced component library (data grids, rich text editors, charts)
+- Raven Studio (visual layout editor)
+- Priority support
+- Performance profiler
+- Early access to new features
 
 ---
 
-## 10. Phased Development Roadmap
+## 14. Key Technical Resources
 
-### Phase 1 — Foundation (Months 1-4)
-**Goal: Get a window on screen with basic UI elements rendering via Vulkan on all three platforms**
-
-- [ ] Swift toolchain setup and verified working on Windows, macOS, Linux
-- [ ] SDL3 integration — window creation and basic input on all three platforms
-- [ ] Vulkan renderer initialized and drawing basic shapes
-- [ ] MoltenVK integrated and verified on macOS
-- [ ] Basic text rendering via SDF fonts
-- [ ] Basic layout engine — VStack, HStack, ZStack equivalents
-- [ ] Three primitive components — Text, Button, View container
-- [ ] Swift/Rust FFI bridge established and stable
-- [ ] Hello World app running identically on all three platforms
-
-### Phase 2 — Core Framework (Months 4-8)
-**Goal: Complete enough to build a real simple application**
-
-- [ ] Full layout engine — padding, spacing, alignment, constraints, scroll
-- [ ] Complete primitive component library — all standard UI elements
-- [ ] State management system — @State, @Binding, @Observable equivalents
-- [ ] Animation system — transitions, springs, easing
-- [ ] Theme system — colors, typography, spacing scales
-- [ ] Navigation patterns — window management, modal sheets, sidebar
-- [ ] Platform layer — file system, clipboard, notifications, drag and drop
-- [ ] Raven CLI — new, build, run commands
-- [ ] Basic hot reload
-- [ ] First public documentation site
-
-### Phase 3 — Developer Experience (Months 8-12)
-**Goal: Good enough that a developer chooses Raven over Tauri for a real project**
-
-- [ ] Cross-compilation — build any platform target from any platform
-- [ ] Full hot reload with state preservation
-- [ ] Performance profiler
-- [ ] Accessibility layer — screen reader support on all platforms
-- [ ] System integration — tray icons, menu bar, OS notifications, dark mode
-- [ ] Package ecosystem — third party Raven component packages via SPM
-- [ ] Public beta release
-- [ ] Community forum and Discord
-
-### Phase 4 — Pro and Ecosystem (Year 2)
-**Goal: Sustainable revenue and growing ecosystem**
-
-- [ ] Raven Studio — visual editor
-- [ ] Advanced Pro component library
-- [ ] Enterprise licensing and support program
-- [ ] Official showcase of apps built with Raven
-- [ ] Conference talks and developer marketing
-- [ ] Raven Pro launch
+- **Swift on Windows** — swift.org/install/windows
+- **Vulkan** — vulkan.lunarg.com
+- **MoltenVK** — github.com/KhronosGroup/MoltenVK
+- **SDL3** — libsdl.org
+- **stb_truetype** — github.com/nothings/stb (font rendering)
+- **stb_image** — github.com/nothings/stb (image loading)
+- **SDF Text** — github.com/Chlumsky/msdfgen
 
 ---
 
-## 11. Go-To-Market Strategy
+## 15. What Raven Is Not
 
-### Build in Public
-Document everything from day one. The developer community that Raven is targeting lives on:
-- **Twitter/X** — post progress, renderer screenshots, code samples
-- **Hacker News** — Show HN posts at key milestones get serious traction for developer tools
-- **Reddit** — r/rust, r/swift, r/programming, r/cpp
-- **YouTube** — devlog series showing the build process and technical decisions
-
-### The Tauri and Electron Frustration Community
-There are active threads on Reddit, Hacker News, and developer Twitter where developers express frustration with every existing option. These are warm audiences who are predisposed to want Raven to exist. Engaging directly with these communities — not spamming, but genuinely participating — builds early adopters.
-
-### First Milestone Worth Sharing
-The moment a Hello World app runs identically on Windows, macOS, and Linux from a single Swift codebase — that is the first thing worth posting publicly. That single demo video is worth more than any amount of marketing copy.
-
----
-
-## 12. Key Technical Resources
-
-- **Swift on Windows** — swift.org/install/windows — official Swift Windows support
-- **Swift on Linux** — swift.org/install/linux — official Swift Linux support
-- **Vulkan** — vulkan.lunarg.com — Vulkan SDK and documentation
-- **MoltenVK** — github.com/KhronosGroup/MoltenVK — Vulkan on macOS/iOS
-- **SDL3** — libsdl.org — window management and input
-- **Swift/Rust interop** — mozilla.org/en-US/firefox/features — study how Firefox handles Swift/Rust FFI
-- **SDF Text Rendering** — github.com/Chlumsky/msdfgen — multi-channel SDF font rendering
-
----
-
-## 13. Immediate First Steps
-
-In order, before anything else:
-
-1. **Verify Swift compiles on your Windows machine** — install the Swift toolchain for Windows, write a Hello World, confirm it compiles and runs
-2. **Get SDL3 creating a window on Windows** — just a blank window, nothing else
-3. **Initialize Vulkan inside that SDL3 window** — clear the screen to a solid color. This is your first GPU frame
-4. **Draw a rectangle via Vulkan** — a colored box on screen. This proves your render pipeline works end to end
-5. **Render a single line of text** — this is the hardest primitive. Once text works, everything else is easier
-6. **Post it publicly** — a Swift app drawing text on a Windows screen via Vulkan is already something worth sharing
-
-Everything else in the entire roadmap builds on top of those five steps.
-
----
-
-## 14. What Raven Is Not
-
-- Not a web technology — no HTML, no CSS, no JavaScript, no DOM
-- Not a game engine — built for application UI, not real-time 3D rendering
-- Not mobile-first — desktop is the primary target, mobile may come later
-- Not a SwiftUI port — inspired by SwiftUI's API design, not a direct port of its implementation
-- Not Apple-controlled — fully independent, not subject to Apple's platform decisions
+- Not a web technology — no HTML, CSS, JavaScript, or DOM
+- Not a game engine — built for application UI, not real-time 3D
+- Not mobile-first — desktop is the primary target
+- Not a SwiftUI port — inspired by SwiftUI's API, not its implementation
+- Not Apple-controlled — fully independent
 - Not another Electron wrapper with a different name
 
 ---
 
-## 15. The Vision
+## 16. The Vision
 
 In five years Raven is the default answer when a professional developer asks "how do I build a cross-platform desktop app that doesn't feel like garbage."
 
-The same way Rust became the default answer to "how do I write systems code without memory bugs" — not by being loudest, but by being genuinely better and letting developers who used it become its advocates.
-
-The developer who builds their internal tooling in Raven tells the next developer. The indie developer who ships a beautiful Raven app gets asked what framework they used. The enterprise team that consolidates three codebases into one tells their conference talk audience.
-
-That's the growth model. Quality first. Everything else follows.
+Quality first. Everything else follows.
 
 ---
 
-*This document represents the complete product vision, technical architecture, and development roadmap for Raven — a Swift-based cross-platform native UI framework. It is intended as the primary briefing document for development handoff to Claude Code or Cowork.*
+*This document represents the complete product vision, technical architecture, implementation status, known issues, and development roadmap for Raven as of March 2026.*

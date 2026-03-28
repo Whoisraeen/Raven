@@ -2,24 +2,17 @@ import Swift
 
 // MARK: - State Property Wrapper
 
+public protocol AnyState {
+    func setViewPath(_ path: String)
+}
+
 /// A property wrapper that stores mutable state and triggers
 /// a re-render when the value changes.
-///
-/// Usage inside View structs:
-/// ```swift
-/// struct CounterView: View {
-///     @State var count = 0
-///     var body: some View {
-///         Button("Count: \(count)") {
-///             count += 1
-///         }
-///     }
-/// }
-/// ```
 @propertyWrapper
-public struct State<Value: Sendable>: @unchecked Sendable {
+public struct State<Value: Sendable>: @unchecked Sendable, AnyState {
     private class Storage {
         var value: Value
+        var viewPath: String? = nil
         init(_ value: Value) { self.value = value }
     }
 
@@ -33,7 +26,11 @@ public struct State<Value: Sendable>: @unchecked Sendable {
         get { storage.value }
         nonmutating set {
             storage.value = newValue
-            StateTracker.shared.markDirty()
+            if let path = storage.viewPath {
+                StateTracker.shared.markDirty(path: path)
+            } else {
+                StateTracker.shared.markDirty()
+            }
         }
     }
 
@@ -42,6 +39,10 @@ public struct State<Value: Sendable>: @unchecked Sendable {
             get: { self.wrappedValue },
             set: { self.wrappedValue = $0 }
         )
+    }
+
+    public func setViewPath(_ path: String) {
+        storage.viewPath = path
     }
 }
 
@@ -185,19 +186,28 @@ public class StateTracker: @unchecked Sendable {
     public static let shared = StateTracker()
 
     private var dirty = false
+    public private(set) var dirtyPaths: Set<String> = []
 
     private init() {}
 
-    /// Mark that a state value has changed.
+    /// Mark that a state value has changed globally.
     public func markDirty() {
         dirty = true
     }
+    
+    /// Mark a specific view path as dirty.
+    public func markDirty(path: String) {
+        dirty = true
+        dirtyPaths.insert(path)
+    }
 
     /// Check and clear the dirty flag.
-    /// Returns true if any state changed since last check.
-    public func checkAndClear() -> Bool {
-        let wasDirty = dirty
+    /// Returns the set of dirty paths if any state changed since last check, nil otherwise.
+    public func checkAndClear() -> Set<String>? {
+        guard dirty else { return nil }
+        let paths = dirtyPaths
         dirty = false
-        return wasDirty
+        dirtyPaths.removeAll()
+        return paths
     }
 }

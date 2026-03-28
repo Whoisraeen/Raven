@@ -8,6 +8,11 @@ public struct ViewBuilder {
         EmptyView()
     }
 
+    // Primitive views return Never from body — pass through without wrapping.
+    public static func buildBlock(_ content: Never) -> Never {
+        content
+    }
+
     // Variadic buildBlock using parameter packs
     public static func buildBlock<each Content: View>(_ content: repeat each Content) -> TupleView<repeat each Content> {
         TupleView(repeat each content)

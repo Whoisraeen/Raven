@@ -1,4 +1,12 @@
-import Foundation
+#if canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(ucrt)
+import ucrt
+#elseif canImport(Darwin)
+import Darwin
+#endif
 
 // MARK: - Animation Primitives
 
@@ -35,7 +43,6 @@ public class AnimationEngine: @unchecked Sendable {
     public static let shared = AnimationEngine()
     
     private var activeAnimations: [AnimationInstance] = []
-    private let lock = NSLock()
     
     private init() {}
     
@@ -44,32 +51,72 @@ public class AnimationEngine: @unchecked Sendable {
     
     /// Update all active animations. Called every frame.
     public func tick(deltaTime: Double) {
-        lock.lock()
-        defer { lock.unlock() }
-        
         var remaining: [AnimationInstance] = []
-        
+
         for var animation in activeAnimations {
             animation.elapsed += deltaTime
             let isFinished = animation.update()
-            
+
             if !isFinished {
                 remaining.append(animation)
             }
         }
-        
+
         activeAnimations = remaining
-        
+
         // Signal that a re-render is needed if any animation updated
         if !activeAnimations.isEmpty {
-            StateTracker.shared.notifyChange()
+            StateTracker.shared.markDirty()
         }
+
+        // Also tick callback-based animations (scroll, etc.)
+        tickCallbackAnimations(deltaTime: deltaTime)
     }
     
     func addAnimation(_ instance: AnimationInstance) {
-        lock.lock()
-        defer { lock.unlock() }
         activeAnimations.append(instance)
+    }
+
+    // MARK: - Callback-based Animations (used by scroll, etc.)
+
+    private var callbackAnimations: [CallbackAnimationInstance] = []
+
+    /// Animate a value over time with a callback. Used for scroll offsets and other
+    /// non-property animations.
+    public func animate(duration: Double = 0.3, from start: Float, to end: Float, update: @escaping (Float) -> Void) {
+        let instance = CallbackAnimationInstance(duration: duration, start: start, end: end, update: update)
+        callbackAnimations.append(instance)
+    }
+
+    /// Tick callback-based animations. Called from the main tick method.
+    private func tickCallbackAnimations(deltaTime: Double) {
+        guard !callbackAnimations.isEmpty else { return }
+
+        var i = 0
+        while i < callbackAnimations.count {
+            let anim = callbackAnimations[i]
+            anim.elapsed += deltaTime
+
+            let progress = min(1.0, Float(anim.elapsed / anim.duration))
+            let t = easeOutQuint(progress)
+            let value = anim.start + (anim.end - anim.start) * t
+
+            anim.update(value)
+
+            if progress >= 1.0 {
+                callbackAnimations.remove(at: i)
+            } else {
+                i += 1
+            }
+        }
+
+        if !callbackAnimations.isEmpty {
+            StateTracker.shared.markDirty()
+        }
+    }
+
+    private func easeOutQuint(_ x: Float) -> Float {
+        return 1 - powf(1 - x, 5)
     }
 }
 
@@ -96,7 +143,19 @@ struct AnimationInstance {
             let smoothT = Float(t * t * (3 - 2 * t)) // Basic Hermite
             apply(value: startValue + (targetValue - startValue) * smoothT)
             return elapsed >= duration
-            
+
+        case .easeIn(let duration):
+            let t = Float(min(elapsed / duration, 1.0))
+            let curved = t * t // Quadratic ease-in
+            apply(value: startValue + (targetValue - startValue) * curved)
+            return elapsed >= duration
+
+        case .easeOut(let duration):
+            let t = Float(min(elapsed / duration, 1.0))
+            let curved = 1 - (1 - t) * (1 - t) // Quadratic ease-out
+            apply(value: startValue + (targetValue - startValue) * curved)
+            return elapsed >= duration
+
         case .spring(let response, let dampingFraction):
             // Simple Damped Spring Simulation (approximated)
             // For a production engine, we'd use a real integrator, 
@@ -128,9 +187,6 @@ struct AnimationInstance {
             let isClose = abs(current - targetValue) < 0.01
             return isClose && elapsed > response * 2.0
             
-        default:
-            apply(value: targetValue)
-            return true
         }
     }
     
@@ -145,6 +201,23 @@ struct AnimationInstance {
         case .rotation: node.rotation = value
         case .color(_): break // Needs color interpolation logic
         }
+    }
+}
+
+// MARK: - CallbackAnimationInstance
+
+private class CallbackAnimationInstance {
+    let duration: Double
+    let start: Float
+    let end: Float
+    var elapsed: Double = 0
+    let update: (Float) -> Void
+
+    init(duration: Double, start: Float, end: Float, update: @escaping (Float) -> Void) {
+        self.duration = duration
+        self.start = start
+        self.end = end
+        self.update = update
     }
 }
 

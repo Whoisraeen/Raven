@@ -466,7 +466,7 @@ final class VulkanRenderer: @unchecked Sendable {
     private var pendingImageCommands: [ImageDrawCommand] = []
 
     func drawFrame(quads: [Quad], textCommands: [TextDrawCommand] = [],
-                   imageCommands: [ImageDrawCommand] = []) {
+                   imageCommands: [ImageDrawCommand] = [], dirtyRect: VkRect2D? = nil) {
         // Upload vertex data
         let allVertices = quads.flatMap { $0.vertices() }
         let vertexDataSize = VkDeviceSize(MemoryLayout<QuadVertex>.stride * allVertices.count)
@@ -524,7 +524,7 @@ final class VulkanRenderer: @unchecked Sendable {
         vkCheck(vkResetCommandBuffer(commandBuffer, 0), "vkResetCommandBuffer")
 
         // Record commands
-        recordCommandBuffer(commandBuffer: commandBuffer, imageIndex: imageIndex)
+        recordCommandBuffer(commandBuffer: commandBuffer, imageIndex: imageIndex, dirtyRect: dirtyRect)
 
         // Submit
         var waitSemaphoreHandle: VkSemaphore? = imageAvailableSemaphore
@@ -588,7 +588,7 @@ final class VulkanRenderer: @unchecked Sendable {
 
     // MARK: - Command Recording
 
-    private func recordCommandBuffer(commandBuffer: VkCommandBuffer, imageIndex: UInt32) {
+    private func recordCommandBuffer(commandBuffer: VkCommandBuffer, imageIndex: UInt32, dirtyRect: VkRect2D? = nil) {
         var beginInfo = VkCommandBufferBeginInfo(
             sType: VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             pNext: nil,
@@ -636,11 +636,16 @@ final class VulkanRenderer: @unchecked Sendable {
         )
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport)
 
-        // Set dynamic scissor
-        var scissor = VkRect2D(
-            offset: VkOffset2D(x: 0, y: 0),
-            extent: swapchainExtent
-        )
+        // Set dynamic scissor (Dirty Rect / Scissor damage optimization)
+        var scissor: VkRect2D
+        if let dr = dirtyRect {
+            scissor = dr
+        } else {
+            scissor = VkRect2D(
+                offset: VkOffset2D(x: 0, y: 0),
+                extent: swapchainExtent
+            )
+        }
         vkCmdSetScissor(commandBuffer, 0, 1, &scissor)
 
         // Push constants (viewport size)

@@ -1,0 +1,15 @@
+namespace raven_core {
+    string version();
+    i32 init();
+    string platform_name();
+    string os_version();
+
+    [Name=clipboard_get]
+    string? get_clipboard_text();
+    [Name=clipboard_set]
+    i32 set_clipboard_text(string text);
+
+    string? open_file_dialog(string title, string filter);
+    string? save_file_dialog(string title, string default_name);
+    string? select_folder_dialog(string title);
+};

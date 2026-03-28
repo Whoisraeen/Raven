@@ -8,7 +8,7 @@ public class FocusManager: @unchecked Sendable {
     public static let shared = FocusManager()
 
     /// The currently focused field's ID (matches LayoutNode identity)
-    private(set) var focusedFieldId: ObjectIdentifier? = nil
+    private(set) var focusedFieldId: String? = nil
 
     /// The cursor position (character index) in the focused field
     public private(set) var cursorPosition: Int = 0
@@ -19,7 +19,7 @@ public class FocusManager: @unchecked Sendable {
     private init() {}
 
     /// Set focus to a specific field.
-    public func setFocus(fieldId: ObjectIdentifier, binding: Binding<String>) {
+    public func setFocus(fieldId: String, binding: Binding<String>) {
         focusedFieldId = fieldId
         focusedBinding = binding
         cursorPosition = binding.wrappedValue.count
@@ -35,7 +35,7 @@ public class FocusManager: @unchecked Sendable {
     }
 
     /// Check if a specific field has focus.
-    public func hasFocus(_ fieldId: ObjectIdentifier) -> Bool {
+    public func hasFocus(_ fieldId: String) -> Bool {
         focusedFieldId == fieldId
     }
 

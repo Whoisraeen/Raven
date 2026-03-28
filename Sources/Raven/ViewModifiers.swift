@@ -47,6 +47,13 @@ public struct CornerRadiusModifier: ViewModifier {
     }
 }
 
+/// Baseline alignment modifier for HStack
+public struct BaselineAlignmentModifier: ViewModifier {
+    public func apply(to node: LayoutNode) {
+        node.alignToBaseline = true
+    }
+}
+
 // MARK: - Accessibility Modifiers
 
 public struct AccessibilityLabelModifier: ViewModifier {
@@ -117,6 +124,11 @@ extension View {
         ModifiedView(content: self, modifier: CornerRadiusModifier(radius: radius))
     }
     
+    /// Align children in an HStack to their text baselines.
+    public func alignToBaseline() -> ModifiedView<Self, BaselineAlignmentModifier> {
+        ModifiedView(content: self, modifier: BaselineAlignmentModifier())
+    }
+
     // MARK: - Accessibility Extensions
 
     public func accessibilityLabel(_ label: String) -> ModifiedView<Self, AccessibilityLabelModifier> {

@@ -1,6 +1,5 @@
 import CSTBImage
 import CVulkan
-import Foundation
 
 // MARK: - ImageDrawCommand
 

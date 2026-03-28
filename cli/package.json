@@ -1,0 +1,30 @@
+{
+  "name": "swift-raven",
+  "version": "0.1.0",
+  "description": "CLI for building and developing Raven UI framework applications",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Whoisraeen/Raven.git"
+  },
+  "bin": {
+    "raven": "bin/raven.js"
+  },
+  "files": [
+    "bin/",
+    "templates/",
+    "README.md"
+  ],
+  "keywords": [
+    "raven",
+    "ui",
+    "framework",
+    "swift",
+    "vulkan",
+    "desktop",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

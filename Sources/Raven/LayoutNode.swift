@@ -31,7 +31,7 @@ public class LayoutNode {
     public var id: AnyHashable? = nil
 
     /// Static cache to persist positions across resolutions for animation
-    internal static var previousPositions: [AnyHashable: (x: Float, y: Float)] = [:]
+    nonisolated(unsafe) internal static var previousPositions: [AnyHashable: (x: Float, y: Float)] = [:]
 
     /// Visual properties
     public var backgroundColor: Color? = nil
@@ -57,11 +57,37 @@ public class LayoutNode {
     /// Flexible (expands to fill available space)
     public var isFlexible: Bool = false
 
+    /// Flex wrap — when true in a horizontal stack, children wrap to the next line
+    public var flexWrap: Bool = false
+
+    /// Line spacing for wrapped flex layouts
+    public var lineSpacing: Float = 8
+
+    /// Alignment baseline — aligns children to their text baseline in horizontal stacks
+    public var alignToBaseline: Bool = false
+
     /// Event handlers
     public var onTap: (@Sendable () -> Void)? = nil
 
     /// Font size for text rendering
     public var fontSize: Float = 16.0
+
+    /// Baseline offset from top of node (for text baseline alignment).
+    /// For text nodes, this is the distance from the top to the text baseline.
+    public var baselineOffset: Float {
+        if text != nil {
+            // Approximate: baseline is ~75% of font height from top
+            let textSize = FontManager.shared.measureText("Ay", fontSize: fontSize)
+            return padding.top + textSize.height * 0.75
+        }
+        // For containers, use the first text child's baseline
+        for child in children {
+            if child.text != nil {
+                return child.y - y + child.baselineOffset
+            }
+        }
+        return cachedIntrinsicHeight * 0.75
+    }
 
     /// Image source path (for Image nodes)
     public var imageSource: String? = nil
@@ -71,7 +97,7 @@ public class LayoutNode {
     public var isTextField: Bool = false
     public var textFieldBinding: Binding<String>? = nil
     public var textFieldPlaceholder: String = ""
-    public var textFieldId: ObjectIdentifier? = nil
+    public var textFieldId: String? = nil
 
     /// ScrollView properties
     public var isScrollView: Bool = false
@@ -86,10 +112,53 @@ public class LayoutNode {
     public var accessibilityHint: String? = nil
     public var isAccessibilityHidden: Bool = false
 
+    /// Platform traits (for native feel/behavioral differences)
+    public var platform: Platform = .windows
+
     /// Children
     public var children: [LayoutNode] = []
 
+    /// Find a node by its unique path/ID.
+    public func findNode(by path: String) -> LayoutNode? {
+        if let id = self.id as? String, id == path { return self }
+        for child in children {
+            if let found = child.findNode(by: path) {
+                return found
+            }
+        }
+        return nil
+    }
+
     public init() {}
+
+    // MARK: - Intrinsic Size Cache
+
+    private var _cachedIntrinsicWidth: Float? = nil
+    private var _cachedIntrinsicHeight: Float? = nil
+
+    /// Cached intrinsic width — computed once per layout pass, then reused.
+    public var cachedIntrinsicWidth: Float {
+        if let cached = _cachedIntrinsicWidth { return cached }
+        let value = intrinsicWidth
+        _cachedIntrinsicWidth = value
+        return value
+    }
+
+    /// Cached intrinsic height — computed once per layout pass, then reused.
+    public var cachedIntrinsicHeight: Float {
+        if let cached = _cachedIntrinsicHeight { return cached }
+        let value = intrinsicHeight
+        _cachedIntrinsicHeight = value
+        return value
+    }
+
+    /// Invalidate cached sizes (called when a node is marked dirty).
+    public func invalidateIntrinsicSize() {
+        _cachedIntrinsicWidth = nil
+        _cachedIntrinsicHeight = nil
+        // Bubble up — parent sizes depend on children
+        // (Not needed during full rebuild since all nodes are new)
+    }
 
     /// The ideal/intrinsic size of this node (before layout assigns a final size)
     public var intrinsicWidth: Float {
@@ -142,6 +211,7 @@ public class LayoutNode {
             }
             return padding.top + padding.bottom
         }
+    }
     // MARK: - Animation Support
 
     private func animate(_ property: AnimatableProperty, from start: Float, to target: Float) {

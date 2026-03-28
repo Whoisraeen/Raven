@@ -79,6 +79,7 @@ public class RavenApp<Content: View>: @unchecked Sendable {
 
         // First frame always needs a full build
         var needsRebuild = true
+        var currentDirtyPaths: Set<String> = []
 
         var lastTicks = SDL_GetTicks()
 
@@ -135,7 +136,21 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                         if let scrollNode = findScrollNode(x: Float(event.wheel.mouse_x),
                                                            y: Float(event.wheel.mouse_y),
                                                            in: root) {
-                            scrollNode.scrollStateVar?.value += scrollAmount
+                            if scrollNode.platform == .macOS {
+                                // Elastic/Smooth scrolling for macOS feel
+                                let currentOffset = scrollNode.scrollStateVar?.value ?? 0
+                                let targetOffset = currentOffset + scrollAmount * 2.5
+                                AnimationEngine.shared.animate(
+                                    duration: 0.15,
+                                    from: currentOffset,
+                                    to: targetOffset
+                                ) { [weak scrollNode] value in
+                                    scrollNode?.scrollStateVar?.value = value
+                                }
+                            } else {
+                                // Rigid/Stepped scrolling for Windows/Linux feel
+                                scrollNode.scrollStateVar?.value += scrollAmount
+                            }
                         }
                     }
 
@@ -145,21 +160,25 @@ public class RavenApp<Content: View>: @unchecked Sendable {
             }
 
             // Check if any @State/@Published/StateVar changed (or if AnimationEngine triggered a frame)
-            if StateTracker.shared.checkAndClear() {
+            if let paths = StateTracker.shared.checkAndClear() {
                 // Snapshot positions from the OLD tree to provide 'start' values for the NEW tree
                 LayoutNode.previousPositions.removeAll(keepingCapacity: true)
                 if let root = rootNode {
                     snapshotPositions(node: root)
                 }
 
+                currentDirtyPaths = paths
                 needsRebuild = true
             }
 
             if isRunning {
+                var dirtyRect: VkRect2D? = nil
+
                 if needsRebuild {
                     // Re-build view tree (captures current state values)
+                    EnvironmentStore.shared.reset()
                     let content = contentBuilder()
-                    let resolved = ViewResolver.resolve(content)
+                    let resolved = ViewResolver.resolve(content, path: "root")
 
                     let viewportWidth = Float(renderer.swapchainExtent.width)
                     let viewportHeight = Float(renderer.swapchainExtent.height)
@@ -170,15 +189,40 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                         viewportHeight: viewportHeight
                     )
 
+                    // Calculate dirty rect (damage region optimization)
+                    if !currentDirtyPaths.isEmpty {
+                        var minX = Float.infinity
+                        var minY = Float.infinity
+                        var maxX = -Float.infinity
+                        var maxY = -Float.infinity
+
+                        for path in currentDirtyPaths {
+                            // Find the node in the NEWLY resolved tree
+                            if let node = resolved.findNode(by: path) {
+                                minX = min(minX, node.x)
+                                minY = min(minY, node.y)
+                                maxX = max(maxX, node.x + node.width)
+                                maxY = max(maxY, node.y + node.height)
+                            }
+                        }
+
+                        if minX != .infinity {
+                            // Expand slightly to avoid sub-pixel clipping artifacts
+                            let x = Int32(max(0, floorf(minX - 1)))
+                            let y = Int32(max(0, floorf(minY - 1)))
+                            let w = UInt32(ceilf(maxX - minX + 2))
+                            let h = UInt32(ceilf(maxY - minY + 2))
+                            dirtyRect = VkRect2D(offset: VkOffset2D(x: x, y: y),
+                                                 extent: VkExtent2D(width: w, height: h))
+                        }
+                        currentDirtyPaths.removeAll()
+                    }
+
                     // Store for hit testing
                     rootNode = resolved
 
-                    // Verify accessibility tree
-                    if let a11yTree = AccessibilityCollector.collect(root: resolved) {
-                        print("\n--- Accessibility Tree Rebuilt ---")
-                        print(a11yTree)
-                        print("----------------------------------\n")
-                    }
+                    // Build accessibility tree (available for screen readers / debugging)
+                    let _ = AccessibilityCollector.collect(root: resolved)
 
                     // Collect quads, text commands, and image commands
                     let renderOutput = RenderCollector.collect(from: resolved)
@@ -200,7 +244,8 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                 // Always present a frame (Vulkan swapchain expects continuous presentation)
                 renderer.drawFrame(quads: cachedQuads,
                                    textCommands: cachedTextCommands,
-                                   imageCommands: cachedImageCommands)
+                                   imageCommands: cachedImageCommands,
+                                   dirtyRect: dirtyRect)
             }
         }
 

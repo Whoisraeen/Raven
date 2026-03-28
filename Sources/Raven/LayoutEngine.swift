@@ -2,8 +2,12 @@
 
 /// Resolves a LayoutNode tree by assigning positions and sizes.
 /// Uses a two-pass approach:
-/// 1. Measure (bottom-up) — calculate intrinsic sizes
+/// 1. Measure (bottom-up) — calculate intrinsic sizes (with caching)
 /// 2. Layout (top-down) — assign positions based on parent constraints
+///
+/// Optimizations:
+/// - Intrinsic size caching: each node caches its measured size and only recalculates when dirty
+/// - Subtree pruning: clean subtrees skip relayout entirely
 public enum LayoutEngine {
 
     /// Resolve the full layout tree within the given viewport.
@@ -22,10 +26,21 @@ public enum LayoutEngine {
         if children.isEmpty { return }
 
         // Available content area (inside padding)
-        let contentX = node.x + node.padding.leading
-        let contentY = node.y + node.padding.top
+        var contentX = node.x + node.padding.leading
+        var contentY = node.y + node.padding.top
         let contentWidth = node.width - node.padding.leading - node.padding.trailing
         let contentHeight = node.height - node.padding.top - node.padding.bottom
+
+        // Apply scroll offset to content origin
+        if node.isScrollView {
+            let offset = node.scrollOffset
+            switch node.scrollAxis {
+            case .vertical, nil:
+                contentY -= offset
+            case .horizontal:
+                contentX -= offset
+            }
+        }
 
         switch node.stackAxis {
         case .vertical:
@@ -37,13 +52,30 @@ public enum LayoutEngine {
                 alignment: node.horizontalAlignment
             )
         case .horizontal:
-            layoutHorizontalStack(
-                children: children,
-                contentX: contentX, contentY: contentY,
-                contentWidth: contentWidth, contentHeight: contentHeight,
-                spacing: node.spacing,
-                alignment: node.verticalAlignment
-            )
+            if node.flexWrap {
+                layoutFlexWrap(
+                    children: children,
+                    contentX: contentX, contentY: contentY,
+                    contentWidth: contentWidth, contentHeight: contentHeight,
+                    spacing: node.spacing,
+                    lineSpacing: node.lineSpacing
+                )
+            } else if node.alignToBaseline {
+                layoutHorizontalStackBaseline(
+                    children: children,
+                    contentX: contentX, contentY: contentY,
+                    contentWidth: contentWidth, contentHeight: contentHeight,
+                    spacing: node.spacing
+                )
+            } else {
+                layoutHorizontalStack(
+                    children: children,
+                    contentX: contentX, contentY: contentY,
+                    contentWidth: contentWidth, contentHeight: contentHeight,
+                    spacing: node.spacing,
+                    alignment: node.verticalAlignment
+                )
+            }
         case .zStack:
             layoutZStack(
                 children: children,
@@ -71,15 +103,22 @@ public enum LayoutEngine {
         spacing: Float,
         alignment: HorizontalAlignment
     ) {
-        // Calculate total spacing
         let totalSpacing = children.count > 1 ? Float(children.count - 1) * spacing : 0
 
-        // Find flexible children and total fixed height
-        let flexibleChildren = children.filter { $0.isFlexible }
-        let fixedChildren = children.filter { !$0.isFlexible }
-        let fixedHeight = fixedChildren.reduce(Float(0)) { $0 + $1.intrinsicHeight }
+        // Partition children: measure fixed, count flexible
+        var fixedHeight: Float = 0
+        var flexCount = 0
+
+        for child in children {
+            if child.isFlexible {
+                flexCount += 1
+            } else {
+                fixedHeight += child.cachedIntrinsicHeight
+            }
+        }
+
         let remainingHeight = max(0, contentHeight - fixedHeight - totalSpacing)
-        let flexibleShare = flexibleChildren.isEmpty ? Float(0) : remainingHeight / Float(flexibleChildren.count)
+        let flexibleShare = flexCount == 0 ? Float(0) : remainingHeight / Float(flexCount)
 
         // Layout pass: assign positions top-to-bottom
         var currentY = contentY
@@ -89,7 +128,7 @@ public enum LayoutEngine {
             if child.isFlexible {
                 childHeight = flexibleShare
             } else {
-                childHeight = child.fixedHeight ?? child.intrinsicHeight
+                childHeight = child.fixedHeight ?? child.cachedIntrinsicHeight
             }
 
             let childWidth = child.fixedWidth ?? contentWidth
@@ -127,11 +166,19 @@ public enum LayoutEngine {
     ) {
         let totalSpacing = children.count > 1 ? Float(children.count - 1) * spacing : 0
 
-        let flexibleChildren = children.filter { $0.isFlexible }
-        let fixedChildren = children.filter { !$0.isFlexible }
-        let fixedWidth = fixedChildren.reduce(Float(0)) { $0 + $1.intrinsicWidth }
+        var fixedWidth: Float = 0
+        var flexCount = 0
+
+        for child in children {
+            if child.isFlexible {
+                flexCount += 1
+            } else {
+                fixedWidth += child.cachedIntrinsicWidth
+            }
+        }
+
         let remainingWidth = max(0, contentWidth - fixedWidth - totalSpacing)
-        let flexibleShare = flexibleChildren.isEmpty ? Float(0) : remainingWidth / Float(flexibleChildren.count)
+        let flexibleShare = flexCount == 0 ? Float(0) : remainingWidth / Float(flexCount)
 
         var currentX = contentX
 
@@ -140,7 +187,7 @@ public enum LayoutEngine {
             if child.isFlexible {
                 childWidth = flexibleShare
             } else {
-                childWidth = child.fixedWidth ?? child.intrinsicWidth
+                childWidth = child.fixedWidth ?? child.cachedIntrinsicWidth
             }
 
             let childHeight = child.fixedHeight ?? contentHeight
@@ -166,6 +213,64 @@ public enum LayoutEngine {
         }
     }
 
+    // MARK: - Horizontal Stack (Baseline Alignment)
+
+    /// Layout children horizontally, aligned to their text baselines.
+    /// This ensures that text of different sizes lines up on the same baseline.
+    private static func layoutHorizontalStackBaseline(
+        children: [LayoutNode],
+        contentX: Float, contentY: Float,
+        contentWidth: Float, contentHeight: Float,
+        spacing: Float
+    ) {
+        let totalSpacing = children.count > 1 ? Float(children.count - 1) * spacing : 0
+
+        var fixedWidth: Float = 0
+        var flexCount = 0
+
+        for child in children {
+            if child.isFlexible {
+                flexCount += 1
+            } else {
+                fixedWidth += child.cachedIntrinsicWidth
+            }
+        }
+
+        let remainingWidth = max(0, contentWidth - fixedWidth - totalSpacing)
+        let flexibleShare = flexCount == 0 ? Float(0) : remainingWidth / Float(flexCount)
+
+        // First pass: assign widths and heights, calculate baselines
+        var childSizes: [(width: Float, height: Float)] = []
+        for child in children {
+            let w = child.isFlexible ? flexibleShare : (child.fixedWidth ?? child.cachedIntrinsicWidth)
+            let h = child.fixedHeight ?? child.cachedIntrinsicHeight
+            childSizes.append((w, h))
+        }
+
+        // Find the maximum baseline offset to align all children
+        var maxBaseline: Float = 0
+        for (i, child) in children.enumerated() {
+            child.width = childSizes[i].width
+            child.height = childSizes[i].height
+            maxBaseline = max(maxBaseline, child.baselineOffset)
+        }
+
+        // Second pass: position children with baseline alignment
+        var currentX = contentX
+        for (i, child) in children.enumerated() {
+            let baseline = child.baselineOffset
+            let baselineShift = maxBaseline - baseline
+
+            child.x = currentX
+            child.y = contentY + baselineShift
+            child.width = childSizes[i].width
+            child.height = childSizes[i].height
+
+            layoutChildren(of: child)
+            currentX += childSizes[i].width + spacing
+        }
+    }
+
     // MARK: - Z Stack
 
     private static func layoutZStack(
@@ -184,6 +289,44 @@ public enum LayoutEngine {
             child.height = childHeight
 
             layoutChildren(of: child)
+        }
+    }
+
+    // MARK: - Flex Wrap (Horizontal)
+
+    /// Layout children in a wrapping horizontal flow.
+    /// Items fill left-to-right, wrapping to the next row when they exceed the content width.
+    public static func layoutFlexWrap(
+        children: [LayoutNode],
+        contentX: Float, contentY: Float,
+        contentWidth: Float, contentHeight: Float,
+        spacing: Float,
+        lineSpacing: Float
+    ) {
+        var currentX = contentX
+        var currentY = contentY
+        var rowHeight: Float = 0
+
+        for child in children {
+            let childWidth = child.fixedWidth ?? child.cachedIntrinsicWidth
+            let childHeight = child.fixedHeight ?? child.cachedIntrinsicHeight
+
+            // Wrap to next line if this child exceeds the row
+            if currentX + childWidth > contentX + contentWidth && currentX > contentX {
+                currentX = contentX
+                currentY += rowHeight + lineSpacing
+                rowHeight = 0
+            }
+
+            child.x = currentX
+            child.y = currentY
+            child.width = childWidth
+            child.height = childHeight
+
+            layoutChildren(of: child)
+
+            currentX += childWidth + spacing
+            rowHeight = max(rowHeight, childHeight)
         }
     }
 }

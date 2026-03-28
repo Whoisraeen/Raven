@@ -76,6 +76,10 @@ let ravenLinkerSettings: [LinkerSetting] = [
     .linkedLibrary("userenv"),
     .linkedLibrary("advapi32"),
     .linkedLibrary("bcrypt"),
+    // Platform bridge (clipboard, file dialogs)
+    .linkedLibrary("user32"),
+    .linkedLibrary("ole32"),
+    .linkedLibrary("shell32"),
 ]
 
 let demoLinkerSettings: [LinkerSetting] = [
@@ -91,6 +95,10 @@ let demoLinkerSettings: [LinkerSetting] = [
     .linkedLibrary("userenv"),
     .linkedLibrary("advapi32"),
     .linkedLibrary("bcrypt"),
+    // Platform bridge (clipboard, file dialogs)
+    .linkedLibrary("user32"),
+    .linkedLibrary("ole32"),
+    .linkedLibrary("shell32"),
 ]
 
 #elseif os(Linux)

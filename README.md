@@ -1,14 +1,14 @@
 <div align="center">
 
-# 🪶 Raven
+# Raven
 
 **A Swift-native cross-platform UI framework**
 
 Build beautiful, performant desktop applications with a SwiftUI-inspired declarative API —
 powered by Vulkan, no Electron, no web views.
 
-[![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
-[![Vulkan](https://img.shields.io/badge/Vulkan-1.0-red.svg)](https://vulkan.lunarg.com)
+[![Swift 5.9+](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
+[![Vulkan](https://img.shields.io/badge/Vulkan-1.4-red.svg)](https://vulkan.lunarg.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-blue.svg)](.)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)](.)
 
@@ -23,23 +23,32 @@ Raven is a **native UI framework** that lets you build cross-platform desktop ap
 ```swift
 import Raven
 
+let count = StateVar(0)
+
 let app = RavenApp(title: "My App") {
     VStack(spacing: 16) {
         Text("Hello, Raven!")
             .foreground(.white)
+            .padding(16)
+
+        Text("Count: \(count.value)")
+            .foreground(.white)
 
         HStack(spacing: 12) {
-            Text("Fast").padding(8).background(.red)
-            Text("Native").padding(8).background(.green)
-            Text("Beautiful").padding(8).background(.blue)
+            Button("Increment") {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    count.value += 1
+                }
+            }
+
+            Button("Reset") {
+                count.value = 0
+            }
         }
 
-        Button("Get Started") {
-            print("Let's go!")
-        }
+        Spacer()
     }
     .padding(32)
-    .background(.surface)
 }
 
 app.run()
@@ -51,19 +60,40 @@ app.run()
 
 ## Features
 
-| Feature | Status |
-|---------|--------|
-| SwiftUI-style declarative API | ✅ |
-| `VStack` / `HStack` / `ZStack` layouts | ✅ |
-| `Text`, `Button`, `Spacer` components | ✅ |
-| View modifiers (`.padding`, `.background`, `.foreground`, `.frame`) | ✅ |
-| Vulkan-powered rendering | ✅ |
-| SDF text rendering | ✅ |
-| SDL3 window management + input | ✅ |
-| `@State` / `@Binding` state management | 🔜 |
-| Animation system | 🔜 |
-| macOS (MoltenVK) + Linux | 🔜 |
-| Hot reload | 🔜 |
+| Category | Feature | Status |
+|----------|---------|--------|
+| **Rendering** | Vulkan 1.4 GPU rendering | Done |
+| | SDF text rendering (TrueType) | Done |
+| | Image rendering (PNG/JPG/BMP) | Done |
+| **Layout** | VStack / HStack / ZStack | Done |
+| | FlowStack (flex-wrap) | Done |
+| | Baseline alignment | Done |
+| | Padding / Frame / Alignment | Done |
+| | Intrinsic size caching | Done |
+| **Components** | Text, Button, Spacer, Image | Done |
+| | TextField (text input) | Done |
+| | ScrollView (vertical/horizontal) | Done |
+| **State** | `StateVar` / `@State` / `@Binding` | Done |
+| | `@Published` / `ObservableObject` | Done |
+| | Dirty tracking with path-based identity | Done |
+| **Animation** | Spring physics (analytic DHO) | Done |
+| | Easing curves (linear, easeIn, easeOut, easeInOut) | Done |
+| | `withAnimation` block API | Done |
+| | Layout transition animations | Done |
+| **Environment** | `@Environment` property wrapper | Done |
+| | Scoped value propagation | Done |
+| | Theme system (light/dark, 20 color tokens) | Done |
+| **Navigation** | NavigationStack (push/pop) | Done |
+| | Sidebar (two-pane layout) | Done |
+| | Sheet (modal overlay) | Done |
+| **Platform** | Clipboard (get/set) | Done |
+| | File dialogs (open/save/folder) | Done |
+| | Swift/Rust FFI bridge | Done |
+| **Tooling** | `raven build` / `raven run` / `raven dev` | Done |
+| | npm CLI (`raven-ui-cli`) | Done |
+| **Platforms** | Windows | Done |
+| | macOS (MoltenVK) | Planned |
+| | Linux | Planned |
 
 ---
 
@@ -73,24 +103,44 @@ app.run()
 
 | Dependency | Version | Notes |
 |-----------|---------|-------|
-| [Swift](https://swift.org/download) | 6.0+ | Windows/macOS/Linux |
-| [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) | 1.0+ | For GPU rendering |
+| [Swift](https://swift.org/download) | 5.9+ | Windows/macOS/Linux |
+| [Rust](https://rustup.rs) | Latest stable | For platform bridge |
+| [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) | 1.0+ | GPU rendering |
 | [SDL3](https://github.com/libsdl-org/SDL) | 3.4+ | Included in `vendor/` |
+
+### Install the CLI
+
+```bash
+npm install -g raven-ui-cli
+```
 
 ### Build & Run
 
-```powershell
+```bash
 # Clone
 git clone https://github.com/Whoisraeen/Raven.git
 cd Raven
 
-# Compile shaders (requires Vulkan SDK)
-powershell -File Bootstrap/WindowsSDLHello/Shaders/compile_shaders.ps1
+# Check prerequisites
+raven doctor
 
-# Build
-swift build
+# Build (Rust + Swift)
+raven build
 
 # Run the demo
+raven run
+```
+
+Or without the CLI:
+
+```bash
+# Build Rust core
+cd rust/raven-core && cargo build && cd ../..
+
+# Build Swift
+swift build
+
+# Run
 swift run RavenDemo
 ```
 
@@ -100,18 +150,100 @@ swift run RavenDemo
 
 ```
 Raven/
-├── Package.swift                ← SPM package definition
+├── Package.swift                  SPM package definition
+├── raven / raven.bat              CLI scripts (bash + Windows)
+├── cli/                           npm package (raven-ui-cli)
 ├── Sources/
-│   ├── Raven/                   ← The framework (import Raven)
-│   │   ├── View.swift           ← View protocol & ViewBuilder
-│   │   ├── LayoutEngine.swift   ← Two-pass layout system
-│   │   ├── Components/          ← Text, Button, Spacer, Stacks
-│   │   ├── Renderer/            ← Vulkan internals (hidden from devs)
-│   │   └── RavenApp.swift       ← App entry point
-│   └── RavenDemo/               ← Example app
-├── Bootstrap/                   ← Original Vulkan bootstrap (reference)
-├── Docs/                        ← Developer documentation
-└── vendor/SDL3/                 ← SDL3 dependency
+│   ├── Raven/                     The framework (import Raven)
+│   │   ├── RavenApp.swift         App entry point & event loop
+│   │   ├── View.swift             View protocol & ViewBuilder
+│   │   ├── ViewResolver.swift     View -> LayoutNode conversion
+│   │   ├── LayoutEngine.swift     Two-pass layout system
+│   │   ├── LayoutNode.swift       Layout tree node
+│   │   ├── State.swift            @State, @Binding, StateVar
+│   │   ├── Animation.swift        Spring & easing animations
+│   │   ├── Environment.swift      @Environment, EnvironmentValues
+│   │   ├── Theme.swift            Semantic color tokens
+│   │   ├── Components/            Text, Button, Stacks, ScrollView, etc.
+│   │   ├── Renderer/              Vulkan internals
+│   │   └── Platform/              Rust FFI bridge (RavenCore.swift)
+│   ├── RavenDemo/                 Example app
+│   ├── CSDL3/                     SDL3 C module
+│   ├── CVulkan/                   Vulkan C module
+│   └── CRavenCore/                Rust FFI C module
+├── rust/raven-core/               Rust platform library
+├── vendor/SDL3/                   SDL3 dependency
+├── Docs/                          Documentation
+└── Bootstrap/                     Original Vulkan bootstrap
+```
+
+---
+
+## Core Concepts
+
+### Declarative Views
+
+```swift
+VStack(spacing: 12) {
+    Text("Title").foreground(.white)
+    HStack(spacing: 8) {
+        Button("OK") { /* action */ }
+        Button("Cancel") { /* action */ }
+    }
+    Spacer()
+}
+.padding(16)
+.background(.surface)
+```
+
+### Reactive State
+
+```swift
+let name = StateVar("World")
+
+// In your view:
+Text("Hello, \(name.value)!")
+TextField("Name", text: name.binding)
+```
+
+### Animations
+
+```swift
+withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+    isExpanded.value.toggle()
+}
+```
+
+### Theming
+
+```swift
+// Access theme colors via environment
+VStack { ... }
+    .environment(\.colorScheme, .light)
+```
+
+### Navigation
+
+```swift
+Sidebar(width: 220) {
+    SidebarItem(label: "Home", isSelected: true) { /* select */ }
+    SidebarItem(label: "Settings") { /* select */ }
+} detail: {
+    Text("Detail content")
+}
+```
+
+### Platform Integration
+
+```swift
+// Clipboard
+let text = RavenCore.clipboardGet()
+RavenCore.clipboardSet("copied!")
+
+// File dialogs
+if let path = RavenCore.openFileDialog(title: "Open", filter: "*.swift") {
+    print("Selected: \(path)")
+}
 ```
 
 ---
@@ -119,9 +251,8 @@ Raven/
 ## Documentation
 
 - **[Getting Started](Docs/GETTING_STARTED.md)** — Build your first Raven app
-- **[API Reference](Docs/API_REFERENCE.md)** — Complete reference for all types
+- **[API Reference](Docs/API_REFERENCE.md)** — Complete type reference
 - **[Architecture](Docs/ARCHITECTURE.md)** — How Raven works internally
-- **[Development Checklist](Docs/Development%20Checklist.md)** — Roadmap progress
 - **[Framework Document](Docs/RAVEN_FRAMEWORK_DOCUMENT.md)** — Vision & design philosophy
 
 ---
