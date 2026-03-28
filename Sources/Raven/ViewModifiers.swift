@@ -54,6 +54,39 @@ public struct BaselineAlignmentModifier: ViewModifier {
     }
 }
 
+/// Font size modifier
+public struct FontSizeModifier: ViewModifier {
+    public let size: Float
+    public func apply(to node: LayoutNode) {
+        node.fontSize = size
+    }
+}
+
+/// Opacity modifier
+public struct OpacityModifier: ViewModifier {
+    public let opacity: Float
+    public func apply(to node: LayoutNode) {
+        node.opacity = opacity
+    }
+}
+
+/// Border modifier
+public struct BorderModifier: ViewModifier {
+    public let color: Color
+    public let width: Float
+    public func apply(to node: LayoutNode) {
+        node.borderColor = color
+        node.borderWidth = width
+    }
+}
+
+/// Hidden modifier
+public struct HiddenModifier: ViewModifier {
+    public func apply(to node: LayoutNode) {
+        node.isHidden = true
+    }
+}
+
 // MARK: - Accessibility Modifiers
 
 public struct AccessibilityLabelModifier: ViewModifier {
@@ -127,6 +160,26 @@ extension View {
     /// Align children in an HStack to their text baselines.
     public func alignToBaseline() -> ModifiedView<Self, BaselineAlignmentModifier> {
         ModifiedView(content: self, modifier: BaselineAlignmentModifier())
+    }
+
+    /// Set the font size.
+    public func font(size: Float) -> ModifiedView<Self, FontSizeModifier> {
+        ModifiedView(content: self, modifier: FontSizeModifier(size: size))
+    }
+
+    /// Set the opacity (0.0 = transparent, 1.0 = opaque).
+    public func opacity(_ opacity: Float) -> ModifiedView<Self, OpacityModifier> {
+        ModifiedView(content: self, modifier: OpacityModifier(opacity: opacity))
+    }
+
+    /// Add a border with color and width.
+    public func border(_ color: Color, width: Float = 1) -> ModifiedView<Self, BorderModifier> {
+        ModifiedView(content: self, modifier: BorderModifier(color: color, width: width))
+    }
+
+    /// Hide the view.
+    public func hidden() -> ModifiedView<Self, HiddenModifier> {
+        ModifiedView(content: self, modifier: HiddenModifier())
     }
 
     // MARK: - Accessibility Extensions

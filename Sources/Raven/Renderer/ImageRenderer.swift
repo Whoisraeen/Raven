@@ -129,6 +129,10 @@ public class ImageRenderer {
         var texImage: VkImage?
         vkCheck(vkCreateImage(device, &imageCI, nil, &texImage), "vkCreateImage(image)")
 
+        // If memory allocation fails below, clean up the image
+        var imageOwned = true
+        defer { if imageOwned { vkDestroyImage(device, texImage, nil) } }
+
         // Allocate memory
         var memReq = VkMemoryRequirements()
         vkGetImageMemoryRequirements(device, texImage, &memReq)
@@ -227,7 +231,8 @@ public class ImageRenderer {
         )
         vkUpdateDescriptorSets(device, 1, &writeDS, 0, nil)
 
-        // Cache
+        // Cache — transfer ownership so defer doesn't destroy the image
+        imageOwned = false
         textureCache[path] = LoadedTexture(
             image: texImage, memory: texMemory,
             imageView: texImageView, descriptorSet: ds,
@@ -280,9 +285,10 @@ public class ImageRenderer {
             let vkBufferUsageVertexBit: VkBufferUsageFlags = 0x00000080
             let vkMemHostVisible: VkMemoryPropertyFlags = 0x00000002
             let vkMemHostCoherent: VkMemoryPropertyFlags = 0x00000004
+            let allocSize = max(dataSize, 1024) * 2
             vertexBuffer = VulkanBuffer.create(
                 device: device, physicalDevice: physicalDevice,
-                size: dataSize, usage: vkBufferUsageVertexBit,
+                size: allocSize, usage: vkBufferUsageVertexBit,
                 memoryPropertyFlags: vkMemHostVisible | vkMemHostCoherent
             )
         }
@@ -648,7 +654,8 @@ public class ImageRenderer {
 // MARK: - Shader Module Helper (shared with TextRenderer)
 private func createShaderModule(device: VkDevice, code: [UInt8]) -> VkShaderModule? {
     code.withUnsafeBytes { rawBuffer in
-        let uint32Pointer = rawBuffer.baseAddress!.assumingMemoryBound(to: UInt32.self)
+        guard let base = rawBuffer.baseAddress else { return nil }
+        let uint32Pointer = base.assumingMemoryBound(to: UInt32.self)
         var createInfo = VkShaderModuleCreateInfo(
             sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             pNext: nil, flags: 0,

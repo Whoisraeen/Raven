@@ -256,6 +256,10 @@ struct VulkanBuffer {
         var buffer: VkBuffer?
         vkCheck(vkCreateBuffer(device, &bufferCreateInfo, nil, &buffer), "vkCreateBuffer")
 
+        // If memory allocation fails below, clean up the buffer
+        var bufferOwned = true
+        defer { if bufferOwned { vkDestroyBuffer(device, buffer, nil) } }
+
         var memoryRequirements = VkMemoryRequirements()
         vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements)
 
@@ -276,6 +280,7 @@ struct VulkanBuffer {
         vkCheck(vkAllocateMemory(device, &allocInfo, nil, &memory), "vkAllocateMemory")
         vkCheck(vkBindBufferMemory(device, buffer, memory, 0), "vkBindBufferMemory")
 
+        bufferOwned = false // Transfer ownership to the returned struct
         return VulkanBuffer(buffer: buffer, memory: memory, size: size)
     }
 
@@ -285,7 +290,8 @@ struct VulkanBuffer {
         guard let mapped else { fail("vkMapMemory returned nil") }
 
         data.withUnsafeBytes { srcBuffer in
-            mapped.copyMemory(from: srcBuffer.baseAddress!, byteCount: srcBuffer.count)
+            guard let base = srcBuffer.baseAddress else { return }
+            mapped.copyMemory(from: base, byteCount: srcBuffer.count)
         }
 
         vkUnmapMemory(device, memory)

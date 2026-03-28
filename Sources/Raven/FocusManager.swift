@@ -4,6 +4,7 @@ import CSDL3
 
 /// Manages keyboard focus for text input fields.
 /// Only one node can have focus at a time.
+/// - Important: Must only be accessed from the main thread (SDL event loop).
 public class FocusManager: @unchecked Sendable {
     public static let shared = FocusManager()
 

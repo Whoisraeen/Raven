@@ -227,7 +227,7 @@ import PackageDescription
 let package = Package(
     name: "${projectName}",
     dependencies: [
-        .package(url: "https://github.com/raven-ui/raven.git", branch: "main"),
+        .package(url: "https://github.com/Whoisraeen/Raven.git", branch: "main"),
     ],
     targets: [
         .executableTarget(

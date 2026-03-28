@@ -39,6 +39,7 @@ public enum AnimatableProperty: Hashable, Sendable {
 // MARK: - AnimationEngine
 
 /// Manages active animations and interpolates values over time.
+/// - Important: Must only be accessed from the main thread (SDL event loop).
 public class AnimationEngine: @unchecked Sendable {
     public static let shared = AnimationEngine()
     
@@ -122,75 +123,88 @@ public class AnimationEngine: @unchecked Sendable {
 
 // MARK: - AnimationInstance (Internal)
 
-struct AnimationInstance {
-    let node: LayoutNode
+class AnimationInstance {
+    weak var node: LayoutNode?
     let property: AnimatableProperty
     let startValue: Float
     let targetValue: Float
     let animation: Animation
     var elapsed: Double = 0
-    
+
+    init(node: LayoutNode, property: AnimatableProperty, startValue: Float, targetValue: Float, animation: Animation) {
+        self.node = node
+        self.property = property
+        self.startValue = startValue
+        self.targetValue = targetValue
+        self.animation = animation
+    }
+
     /// Updates the node's property. Returns true if finished.
     func update() -> Bool {
+        // If the node was deallocated, consider the animation finished
+        guard node != nil else { return true }
         switch animation {
         case .linear(let duration):
+            guard duration > 0 else { apply(value: targetValue); return true }
             let t = Float(min(elapsed / duration, 1.0))
             apply(value: startValue + (targetValue - startValue) * t)
             return elapsed >= duration
-            
+
         case .easeInOut(let duration):
+            guard duration > 0 else { apply(value: targetValue); return true }
             let t = min(elapsed / duration, 1.0)
             let smoothT = Float(t * t * (3 - 2 * t)) // Basic Hermite
             apply(value: startValue + (targetValue - startValue) * smoothT)
             return elapsed >= duration
 
         case .easeIn(let duration):
+            guard duration > 0 else { apply(value: targetValue); return true }
             let t = Float(min(elapsed / duration, 1.0))
             let curved = t * t // Quadratic ease-in
             apply(value: startValue + (targetValue - startValue) * curved)
             return elapsed >= duration
 
         case .easeOut(let duration):
+            guard duration > 0 else { apply(value: targetValue); return true }
             let t = Float(min(elapsed / duration, 1.0))
             let curved = 1 - (1 - t) * (1 - t) // Quadratic ease-out
             apply(value: startValue + (targetValue - startValue) * curved)
             return elapsed >= duration
 
         case .spring(let response, let dampingFraction):
-            // Simple Damped Spring Simulation (approximated)
-            // For a production engine, we'd use a real integrator, 
-            // but this analytic solution works for simple UI.
-            let stiffness = pow(2.0 * .pi / response, 2.0)
-            let damping = 4.0 * .pi * dampingFraction / response
-            
+            // Clamp parameters to avoid NaN/overflow
+            let safeResponse = max(response, 0.01)
+            let safeDamping = min(max(dampingFraction, 0.0), 1.0)
+
+            let stiffness = pow(2.0 * .pi / safeResponse, 2.0)
+            let damping = 4.0 * .pi * safeDamping / safeResponse
+
             let t = elapsed
             let x0 = Double(targetValue - startValue)
-            
-            // Critical damping check
+
             let value: Double
-            if dampingFraction < 1.0 {
+            if safeDamping < 1.0 {
                 // Underdamped
-                let wd = sqrt(stiffness) * sqrt(1.0 - dampingFraction * dampingFraction)
+                let wd = sqrt(stiffness) * sqrt(1.0 - safeDamping * safeDamping)
                 let a = x0
                 let b = (damping / 2.0 * x0) / wd
                 value = exp(-damping / 2.0 * t) * (a * cos(wd * t) + b * sin(wd * t))
             } else {
-                // Critically damped or Overdamped
-                let value1 = x0 * (1.0 + (damping / 2.0) * t) * exp(-damping / 2.0 * t)
-                value = value1
+                // Critically damped
+                value = x0 * (1.0 + (damping / 2.0) * t) * exp(-damping / 2.0 * t)
             }
-            
+
             let current = Float(Double(targetValue) - value)
-            apply(value: current)
-            
-            // Finish when close enough and enough time has passed
+            apply(value: current.isNaN ? targetValue : current)
+
             let isClose = abs(current - targetValue) < 0.01
-            return isClose && elapsed > response * 2.0
-            
+            return isClose && elapsed > safeResponse * 2.0
+
         }
     }
     
     private func apply(value: Float) {
+        guard let node = node else { return }
         switch property {
         case .x: node.x = value
         case .y: node.y = value

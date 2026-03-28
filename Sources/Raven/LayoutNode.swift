@@ -38,6 +38,13 @@ public class LayoutNode {
     public var foregroundColor: Color? = nil
     public var cornerRadius: Float = 0
 
+    /// Border
+    public var borderColor: Color? = nil
+    public var borderWidth: Float = 0
+
+    /// Hidden — when true, node is not rendered
+    public var isHidden: Bool = false
+
     /// Text content (for Text nodes)
     public var text: String? = nil
 
@@ -77,7 +84,7 @@ public class LayoutNode {
     public var baselineOffset: Float {
         if text != nil {
             // Approximate: baseline is ~75% of font height from top
-            let textSize = FontManager.shared.measureText("Ay", fontSize: fontSize)
+            let textSize = FontManager.shared.measureText(text ?? "Ay", fontSize: fontSize)
             return padding.top + textSize.height * 0.75
         }
         // For containers, use the first text child's baseline
@@ -164,7 +171,7 @@ public class LayoutNode {
     public var intrinsicWidth: Float {
         if let fw = fixedWidth { return fw }
         if let text = text {
-            let textSize = FontManager.shared.measureText(text, fontSize: 16.0)
+            let textSize = FontManager.shared.measureText(text, fontSize: fontSize)
             return textSize.width + padding.leading + padding.trailing
         }
         switch stackAxis {
@@ -190,7 +197,7 @@ public class LayoutNode {
     public var intrinsicHeight: Float {
         if let fh = fixedHeight { return fh }
         if let text = text {
-            let textSize = FontManager.shared.measureText(text, fontSize: 16.0)
+            let textSize = FontManager.shared.measureText(text, fontSize: fontSize)
             return textSize.height + padding.top + padding.bottom
         }
         switch stackAxis {

@@ -29,9 +29,6 @@ vendor/*.7z
 # ─── Compiled shaders (regenerated from source) ───
 *.spv
 
-# ─── Dev tooling ───
-.gemini/
-
 # ─── Temporary / build outputs ───
 *.o
 *.d
@@ -43,3 +40,16 @@ build_log.txt
 *build_log*.txt
 *.log
 *.tmp
+
+# ─── AI Tooling ───
+.agents/
+.cursorrules
+.cursor/
+.cline/
+.windsurfrules
+.anthropic/
+.codium/
+.continue/
+.ai/
+.prompts/
+.gemini/

@@ -147,6 +147,15 @@ public class TextRenderer {
         )
         vkCheck(vkCreateImage(device, &imageCreateInfo, nil, &atlasImage), "vkCreateImage(fontAtlas)")
 
+        // If memory allocation fails, clean up the image
+        var atlasImageOwned = true
+        defer {
+            if atlasImageOwned {
+                vkDestroyImage(device, atlasImage, nil)
+                atlasImage = nil
+            }
+        }
+
         // Allocate memory
         var memReq = VkMemoryRequirements()
         vkGetImageMemoryRequirements(device, atlasImage, &memReq)
@@ -165,6 +174,7 @@ public class TextRenderer {
         )
         vkCheck(vkAllocateMemory(device, &allocInfo, nil, &atlasMemory), "vkAllocateMemory(fontAtlas)")
         vkCheck(vkBindImageMemory(device, atlasImage, atlasMemory, 0), "vkBindImageMemory(fontAtlas)")
+        atlasImageOwned = false // Memory bound successfully, image is now fully owned by the class
 
         // Transition image layout and copy buffer
         let cmdBuf = beginSingleTimeCommands()
@@ -489,6 +499,9 @@ public class TextRenderer {
             vkCreateGraphicsPipelines(device, nil, 1, &pipelineInfo, nil, &graphicsPipeline),
             "vkCreateGraphicsPipelines(text)"
         )
+
+        // Free the SDL_strdup'd entry point name
+        SDL_free(entryPoint)
     }
 
     // MARK: - Generate Text Vertices
@@ -611,6 +624,15 @@ public class TextRenderer {
             )
             vkCheck(vkCreateImage(device, &imageCreateInfo, nil, &atlasImage), "vkCreateImage(atlasGrow)")
 
+            // If memory allocation fails, clean up the new image
+            var growImageOwned = true
+            defer {
+                if growImageOwned {
+                    vkDestroyImage(device, atlasImage, nil)
+                    atlasImage = nil
+                }
+            }
+
             var memReq = VkMemoryRequirements()
             vkGetImageMemoryRequirements(device, atlasImage, &memReq)
             let vkMemoryPropertyDeviceLocal: VkMemoryPropertyFlags = 0x00000001
@@ -627,6 +649,7 @@ public class TextRenderer {
             )
             vkCheck(vkAllocateMemory(device, &allocInfo, nil, &atlasMemory), "vkAllocateMemory(atlasGrow)")
             vkCheck(vkBindImageMemory(device, atlasImage, atlasMemory, 0), "vkBindImageMemory(atlasGrow)")
+            growImageOwned = false // Memory bound successfully
 
             // Upload data
             let vkBufferUsageTransferSrc: VkBufferUsageFlags = 0x00000001
@@ -760,9 +783,10 @@ public class TextRenderer {
             let vkBufferUsageVertexBit: VkBufferUsageFlags = 0x00000080
             let vkMemoryPropertyHostVisibleBit: VkMemoryPropertyFlags = 0x00000002
             let vkMemoryPropertyHostCoherentBit: VkMemoryPropertyFlags = 0x00000004
+            let allocSize = max(dataSize, 1024) * 2
             vertexBuffer = VulkanBuffer.create(
                 device: device, physicalDevice: physicalDevice,
-                size: dataSize, usage: vkBufferUsageVertexBit,
+                size: allocSize, usage: vkBufferUsageVertexBit,
                 memoryPropertyFlags: vkMemoryPropertyHostVisibleBit | vkMemoryPropertyHostCoherentBit
             )
         }
@@ -901,7 +925,8 @@ public class TextRenderer {
 
 private func createShaderModule(device: VkDevice, code: [UInt8]) -> VkShaderModule? {
     code.withUnsafeBytes { rawBuffer in
-        let uint32Pointer = rawBuffer.baseAddress!.assumingMemoryBound(to: UInt32.self)
+        guard let base = rawBuffer.baseAddress else { return nil }
+        let uint32Pointer = base.assumingMemoryBound(to: UInt32.self)
         var createInfo = VkShaderModuleCreateInfo(
             sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
             pNext: nil, flags: 0,

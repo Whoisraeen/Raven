@@ -117,6 +117,7 @@ extension View {
 
 /// Global store for environment values during a view resolution pass.
 /// ViewResolver pushes/pops scopes as it enters/leaves subtrees with environment overrides.
+/// - Important: Must only be accessed from the main thread (SDL event loop).
 public class EnvironmentStore: @unchecked Sendable {
     public static let shared = EnvironmentStore()
     private init() {}

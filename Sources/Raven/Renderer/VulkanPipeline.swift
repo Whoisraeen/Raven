@@ -417,7 +417,8 @@ final class VulkanPipeline {
 
     private static func createShaderModule(device: VkDevice, spirv: [UInt8]) -> VkShaderModule? {
         spirv.withUnsafeBytes { rawBuffer in
-            let uint32Pointer = rawBuffer.baseAddress!.assumingMemoryBound(to: UInt32.self)
+            guard let base = rawBuffer.baseAddress else { return nil }
+            let uint32Pointer = base.assumingMemoryBound(to: UInt32.self)
             var createInfo = VkShaderModuleCreateInfo(
                 sType: VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 pNext: nil,

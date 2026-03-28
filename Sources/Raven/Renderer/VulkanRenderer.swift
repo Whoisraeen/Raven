@@ -139,7 +139,9 @@ final class VulkanRenderer: @unchecked Sendable {
 
         // MoltenVK on macOS requires the portability enumeration extension
         #if os(macOS)
-        let portabilityExtName = SDL_strdup("VK_KHR_portability_enumeration")!
+        guard let portabilityExtName = SDL_strdup("VK_KHR_portability_enumeration") else {
+            fatalError("Failed to allocate Vulkan extension name string")
+        }
         extensionNames.append(UnsafePointer(portabilityExtName))
         #endif
 
@@ -184,6 +186,10 @@ final class VulkanRenderer: @unchecked Sendable {
             }
         }
 
+        #if os(macOS)
+        SDL_free(portabilityExtName)
+        #endif
+
         guard let instance = instanceHandle else { fail("vkCreateInstance returned null") }
 
         // --- Surface ---
@@ -227,9 +233,15 @@ final class VulkanRenderer: @unchecked Sendable {
         var queuePriority: Float = 1.0
 
         // Device extensions: swapchain is always required, portability subset for MoltenVK
-        var deviceExtNames: [UnsafeMutablePointer<CChar>] = [SDL_strdup("VK_KHR_swapchain")!]
+        guard let swapchainExtName = SDL_strdup("VK_KHR_swapchain") else {
+            fatalError("Failed to allocate Vulkan extension name string")
+        }
+        var deviceExtNames: [UnsafeMutablePointer<CChar>] = [swapchainExtName]
         #if os(macOS)
-        deviceExtNames.append(SDL_strdup("VK_KHR_portability_subset")!)
+        guard let portabilitySubsetName = SDL_strdup("VK_KHR_portability_subset") else {
+            fatalError("Failed to allocate Vulkan extension name string")
+        }
+        deviceExtNames.append(portabilitySubsetName)
         #endif
         let deviceExtPtrs: [UnsafePointer<CChar>?] = deviceExtNames.map { UnsafePointer($0) }
 
@@ -476,16 +488,17 @@ final class VulkanRenderer: @unchecked Sendable {
 
         if allVertices.isEmpty && textCommands.isEmpty && imageCommands.isEmpty { return }
 
-        // Recreate buffer if needed
+        // Recreate buffer with geometric growth (2x) to avoid per-frame reallocation
         if vertexBuffer == nil || vertexBuffer!.size < vertexDataSize {
             vertexBuffer?.destroy(device: device)
             let vkBufferUsageVertexBit: VkBufferUsageFlags = 0x00000080
             let vkMemoryPropertyHostVisibleBit: VkMemoryPropertyFlags = 0x00000002
             let vkMemoryPropertyHostCoherentBit: VkMemoryPropertyFlags = 0x00000004
+            let allocSize = max(vertexDataSize, 1024) * 2
             vertexBuffer = VulkanBuffer.create(
                 device: device,
                 physicalDevice: physicalDevice,
-                size: vertexDataSize,
+                size: allocSize,
                 usage: vkBufferUsageVertexBit,
                 memoryPropertyFlags: vkMemoryPropertyHostVisibleBit
                     | vkMemoryPropertyHostCoherentBit

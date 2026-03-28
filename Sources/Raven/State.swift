@@ -182,6 +182,7 @@ public class StateVar<Value: Sendable>: @unchecked Sendable {
 
 /// Global tracker that monitors whether any @State/@Published/StateVar has changed.
 /// The app loop checks this each frame to decide whether to re-render.
+/// - Important: Must only be accessed from the main thread (SDL event loop).
 public class StateTracker: @unchecked Sendable {
     public static let shared = StateTracker()
 

@@ -131,6 +131,23 @@ public enum ViewResolver {
             return node
         }
 
+        // ForEach
+        if let forEach = view as? AnyForEachView {
+            let node = forEach.resolveForEach(path: path)
+            node.id = path
+            return node
+        }
+
+        // Divider
+        if view is Divider {
+            let theme = EnvironmentStore.shared.current.theme
+            let node = LayoutNode()
+            node.fixedHeight = 1
+            node.backgroundColor = theme.divider
+            node.id = path
+            return node
+        }
+
         // FlowStack
         if let flowStack = view as? FlowStack {
             let node = resolveFlowStack(flowStack, path: path)
