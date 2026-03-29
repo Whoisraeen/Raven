@@ -49,7 +49,7 @@ protocol AnyListView {
 
 extension List: AnyListView {
     func resolveList(path: String) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
+        let theme = Theme.current
 
         // Outer scroll container
         let scrollNode = LayoutNode()
@@ -69,7 +69,7 @@ extension List: AnyListView {
             if showDividers && index > 0 {
                 let divider = LayoutNode()
                 divider.fixedHeight = 1
-                divider.backgroundColor = theme.divider
+                divider.backgroundColor = theme.colors.divider
                 divider.id = "\(path).ld\(index)"
                 children.append(divider)
             }

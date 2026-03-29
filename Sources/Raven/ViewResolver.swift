@@ -178,10 +178,10 @@ public enum ViewResolver {
     // MARK: - Primitives
 
     private static func resolveText(_ text: Text) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
+        let theme = Theme.current
         let node = LayoutNode()
         node.text = text.content
-        node.foregroundColor = text.color ?? theme.text
+        node.foregroundColor = text.color ?? theme.colors.text
         node.backgroundColor = nil
         node.accessibilityRole = .text
         node.accessibilityLabel = text.content
@@ -189,10 +189,10 @@ public enum ViewResolver {
     }
 
     private static func resolveButton(_ button: Button) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
+        let theme = Theme.current
         let node = LayoutNode()
-        node.backgroundColor = button.backgroundColor ?? theme.buttonBackground
-        node.cornerRadius = theme.buttonCornerRadius
+        node.backgroundColor = button.backgroundColor ?? theme.colors.primary
+        node.cornerRadius = theme.shapes.md
         node.onTap = button.action
 
         let textNode = LayoutNode()
@@ -224,24 +224,24 @@ public enum ViewResolver {
     }
 
     private static func resolveTextField(_ textField: TextField, path: String) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
+        let theme = Theme.current
         let node = LayoutNode()
         node.isTextField = true
         node.textFieldBinding = textField.text
         node.textFieldPlaceholder = textField.placeholder
         node.textFieldId = path
-        node.backgroundColor = theme.inputBackground
-        node.cornerRadius = theme.textFieldCornerRadius
+        node.backgroundColor = theme.colors.surface
+        node.cornerRadius = theme.shapes.sm
         node.padding = EdgeInsets(
-            top: theme.textFieldPaddingVertical,
-            leading: theme.textFieldPaddingHorizontal,
-            bottom: theme.textFieldPaddingVertical,
-            trailing: theme.textFieldPaddingHorizontal
+            top: theme.spacing.sm,
+            leading: theme.spacing.md,
+            bottom: theme.spacing.sm,
+            trailing: theme.spacing.md
         )
         node.accessibilityRole = .textField
         node.accessibilityValue = textField.text.wrappedValue
 
-        if node.fixedWidth == nil { node.fixedWidth = theme.textFieldDefaultWidth }
+        if node.fixedWidth == nil { node.fixedWidth = 200 }
         return node
     }
 
@@ -650,7 +650,7 @@ public enum ViewResolver {
                 : Theme.current.colors.textSecondary
             tabNode.padding = EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
             tabNode.id = "\(path).tb\(index)"
-            tabNode.isSpacer = true  // flex equally
+            tabNode.isFlexible = true  // flex equally
             tabNode.onTap = { [selection = tabView.selection, idx = index] in
                 selection.wrappedValue = idx
             }
@@ -666,7 +666,7 @@ public enum ViewResolver {
 
         // Content takes up remaining space
         let spacerNode = LayoutNode()
-        spacerNode.isSpacer = true
+        spacerNode.isFlexible = true
         spacerNode.id = "\(path).ts"
 
         node.children = [contentNode, spacerNode, dividerNode, tabBarNode]

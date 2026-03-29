@@ -1,5 +1,7 @@
 import Raven
 
+print("Hello from RavenDemo — module loaded OK")
+
 // MARK: - Discord Demo State
 let selectedServer = StateVar(1).preserveOnReload("selectedServer")
 let selectedChannel = StateVar(0).preserveOnReload("selectedChannel")
@@ -272,4 +274,5 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1200, height:
     }
 }
 
+print("App object created, about to call run()...")
 app.run()

@@ -19,7 +19,7 @@
 /// ```
 public struct Theme: Sendable {
     /// The active global theme. Defaults to `.dark`.
-    public static var current = Theme.dark
+    public nonisolated(unsafe) static var current = Theme.dark
 
     // MARK: - Color Palette
 

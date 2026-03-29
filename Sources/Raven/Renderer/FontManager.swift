@@ -217,7 +217,7 @@ public class FontManager: @unchecked Sendable {
 
     // Text measurement cache
     private var measurementCache: [MeasurementKey: (width: Float, height: Float)] = [:]
-    private let measurementLock = NSLock()
+    private let measurementLock = RavenLock()
 
     /// Invalidate the text measurement cache (called when font changes).
     public func invalidateMeasurementCache() {
@@ -244,7 +244,7 @@ public class FontManager: @unchecked Sendable {
 
         guard fontLoaded else {
             // Fallback to monospace 8px-based approximation for the fallback font
-            let result = (width: Float(text.count) * (fontSize / 2.0), height: height)
+            let result = (width: Float(text.count) * (fontSize / 2.0), height: lineHeight)
             measurementLock.lock()
             measurementCache[key] = result
             measurementLock.unlock()
@@ -293,23 +293,14 @@ public class FontManager: @unchecked Sendable {
                 if wordStart { wordWidth = 0; wordStart = false }
                 wordWidth += advance
 
-                // Word wrap: if we have a maxWidth and this word pushes past it
-                if maxWidth > 0 && lineWidth + advance > maxWidth && lineWidth > 0 {
-                    maxLineWidth = max(maxLineWidth, lineWidth - wordWidth)
-                    lineWidth = wordWidth
-                    lineCount += 1
-                    prevCodepoint = cp
-                    lineWidth += advance - wordWidth + wordWidth // already counted
-                    continue
-                }
-
                 lineWidth += advance
             }
 
             prevCodepoint = cp
         }
 
-        let result = (width: width, height: height)
+        maxLineWidth = max(maxLineWidth, lineWidth)
+        let result = (width: maxLineWidth, height: lineCount * lineHeight)
 
         // Store in cache
         measurementLock.lock()

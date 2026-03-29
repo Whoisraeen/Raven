@@ -32,19 +32,4 @@ public struct NavigationView: View {
 
 // MARK: - Divider
 
-/// A thin horizontal or vertical line used to separate content.
-///
-/// Usage:
-/// ```swift
-/// VStack {
-///     Text("Above")
-///     Divider()
-///     Text("Below")
-/// }
-/// ```
-public struct Divider: View {
-    public typealias Body = Never
-    public var body: Never { fatalError("Divider is a primitive view") }
-
-    public init() {}
-}
+// Note: Divider is defined in Components/Divider.swift

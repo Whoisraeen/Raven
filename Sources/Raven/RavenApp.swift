@@ -1,6 +1,9 @@
 import CSDL3
 import CVulkan
 import Foundation
+#if canImport(ucrt)
+import ucrt
+#endif
 
 
 // MARK: - RavenApp
@@ -33,6 +36,11 @@ public class RavenApp<Content: View>: @unchecked Sendable {
 
     /// Start the application event loop.
     public func run() {
+        // Disable stdout buffering so crash diagnostics are visible
+        #if os(Windows)
+        setvbuf(stdout, nil, _IONBF, 0)
+        #endif
+
         // Initialize Rust core
         RavenCore.initialize()
         print("Raven Core v\(RavenCore.version) on \(RavenCore.platformName) (\(RavenCore.osVersion))")
@@ -50,8 +58,11 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         }
         defer { SDL_DestroyWindow(window) }
 
+        print("[Raven] Window created, initializing Vulkan renderer...")
+
         // Create renderer
         let renderer = VulkanRenderer(window: window)
+        print("[Raven] Renderer initialized successfully")
         defer { renderer.destroy() }
 
         // Event types

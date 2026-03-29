@@ -36,7 +36,7 @@ enum RavenCore {
 
     /// Get the current clipboard text, or nil if empty/unavailable.
     static func clipboardGet() -> String? {
-        guard let ptr = raven_core_clipboard_get() else { return nil }
+        guard let ptr = raven_clipboard_get_text() else { return nil }
         let str = String(cString: ptr)
         raven_core_free_string(ptr)
         return str
@@ -46,7 +46,7 @@ enum RavenCore {
     @discardableResult
     static func clipboardSet(_ text: String) -> Bool {
         text.withCString { cStr in
-            raven_core_clipboard_set(cStr) == 0
+            raven_clipboard_set_text(cStr) == 0
         }
     }
 
@@ -56,7 +56,7 @@ enum RavenCore {
     static func openFileDialog(title: String = "Open File", filter: String? = nil) -> String? {
         let result = title.withCString { titlePtr in
             (filter ?? "").withCString { filterPtr in
-                raven_core_open_file_dialog(titlePtr, filterPtr)
+                raven_file_dialog_open(titlePtr, filterPtr)
             }
         }
         guard let ptr = result else { return nil }
@@ -69,19 +69,8 @@ enum RavenCore {
     static func saveFileDialog(title: String = "Save File", defaultName: String? = nil) -> String? {
         let result = title.withCString { titlePtr in
             (defaultName ?? "").withCString { namePtr in
-                raven_core_save_file_dialog(titlePtr, namePtr)
+                raven_file_dialog_save(titlePtr, namePtr)
             }
-        }
-        guard let ptr = result else { return nil }
-        let str = String(cString: ptr)
-        raven_core_free_string(ptr)
-        return str
-    }
-
-    /// Show a select-folder dialog. Returns the selected folder path, or nil if cancelled.
-    static func selectFolderDialog(title: String = "Select Folder") -> String? {
-        let result = title.withCString { titlePtr in
-            raven_core_select_folder_dialog(titlePtr)
         }
         guard let ptr = result else { return nil }
         let str = String(cString: ptr)

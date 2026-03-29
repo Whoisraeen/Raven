@@ -42,7 +42,7 @@ public enum RavenLogger {
 
     /// Minimum level to output. Messages below this level are silently dropped.
     /// Default: `.debug` in debug builds, `.warning` in release builds.
-    public static var minimumLevel: Level = {
+    public nonisolated(unsafe) static var minimumLevel: Level = {
         #if DEBUG
         return .debug
         #else
@@ -52,7 +52,7 @@ public enum RavenLogger {
 
     /// Optional custom log handler. If set, receives all log messages instead of printing to stderr.
     /// Useful for integrating with external logging frameworks.
-    public static var customHandler: ((Level, String, String, String, UInt) -> Void)?
+    public nonisolated(unsafe) static var customHandler: ((Level, String, String, String, UInt) -> Void)?
 
     // MARK: - Log Methods
 

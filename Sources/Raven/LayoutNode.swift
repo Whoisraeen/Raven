@@ -258,7 +258,7 @@ public class LayoutNode {
         if let fh = fixedHeight { return fh }
         if let text = text {
             let wrapWidth = maxTextWidth ?? 0
-            let textSize = FontManager.shared.measureText(text, fontSize: fontSize, maxWidth: wrapWidth)
+            let textSize = FontManager.shared.measureText(text, fontSize: fontSize)
             return textSize.height + padding.top + padding.bottom
         }
         switch stackAxis {

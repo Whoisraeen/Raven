@@ -1,4 +1,7 @@
 import CVulkan
+#if canImport(WinSDK)
+import WinSDK
+#endif
 
 // MARK: - VulkanDebugMessenger
 
@@ -37,7 +40,7 @@ final class VulkanDebugMessenger {
 
     /// Whether debug mode is enabled. True in debug builds by default.
     static var isEnabled: Bool {
-        #if DEBUG
+        #if false // Temporarily disabled for debugging crash
         return true
         #else
         // Allow opt-in in release via environment variable
@@ -138,11 +141,11 @@ private func vulkanDebugCallback(
 
     // Determine severity tag
     let severityTag: String
-    if (messageSeverity.rawValue & vkDebugUtilsMessageSeverityErrorBitEXT) != 0 {
+    if (UInt32(messageSeverity.rawValue) & vkDebugUtilsMessageSeverityErrorBitEXT) != 0 {
         severityTag = "[VULKAN-ERROR]"
-    } else if (messageSeverity.rawValue & vkDebugUtilsMessageSeverityWarningBitEXT) != 0 {
+    } else if (UInt32(messageSeverity.rawValue) & vkDebugUtilsMessageSeverityWarningBitEXT) != 0 {
         severityTag = "[VULKAN-WARNING]"
-    } else if (messageSeverity.rawValue & vkDebugUtilsMessageSeverityInfoBitEXT) != 0 {
+    } else if (UInt32(messageSeverity.rawValue) & vkDebugUtilsMessageSeverityInfoBitEXT) != 0 {
         severityTag = "[VULKAN-INFO]"
     } else {
         severityTag = "[VULKAN-VERBOSE]"

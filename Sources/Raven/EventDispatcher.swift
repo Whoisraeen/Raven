@@ -9,11 +9,11 @@ public class EventDispatcher {
 
     /// The currently dragged slider node (if any).
     /// Set on mouse down over a slider, cleared on mouse up.
-    public static var activeSliderNode: LayoutNode? = nil
+    nonisolated(unsafe) public static var activeSliderNode: LayoutNode? = nil
 
     /// The currently expanded menu picker node (if any).
     /// Tracked so we can close it when clicking elsewhere.
-    public static var expandedMenuPickerNode: LayoutNode? = nil
+    nonisolated(unsafe) public static var expandedMenuPickerNode: LayoutNode? = nil
 
     /// Process a mouse click at the given coordinates.
     /// Walks the LayoutNode tree, finds the deepest node at (x,y),

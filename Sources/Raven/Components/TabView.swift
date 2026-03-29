@@ -30,7 +30,7 @@ public struct TabView: View {
 }
 
 /// A single tab item with a label and associated view content.
-public struct TabItem: Sendable {
+public struct TabItem: @unchecked Sendable {
     public let label: String
     public let index: Int
     public let content: [any View]

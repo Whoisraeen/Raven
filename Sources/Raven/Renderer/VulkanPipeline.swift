@@ -518,11 +518,12 @@ final class VulkanPipeline {
             guard size > 0 else { return nil }
             fseek(file, 0, SEEK_SET)
 
-            var data = [UInt8](repeating: 0, count: size)
+            let fileSize = Int(size)
+            var data = [UInt8](repeating: 0, count: fileSize)
             let read = data.withUnsafeMutableBufferPointer { buffer in
-                fread(buffer.baseAddress, 1, size, file)
+                fread(buffer.baseAddress, 1, fileSize, file)
             }
-            guard read == size else { return nil }
+            guard read == fileSize else { return nil }
             return data
         }
     }

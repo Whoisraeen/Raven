@@ -77,7 +77,7 @@ public enum RenderCollector {
             let scale = node.fontSize / 16.0
             let availWidth = node.width - node.padding.leading - node.padding.trailing
             let maxTextWidth = node.maxTextWidth ?? (availWidth > 0 ? availWidth : 0)
-            let textSize = FontManager.shared.measureText(text, fontSize: node.fontSize, maxWidth: maxTextWidth)
+            let textSize = FontManager.shared.measureText(text, fontSize: node.fontSize)
             let textWidth = textSize.width
             let textHeight = textSize.height
 
