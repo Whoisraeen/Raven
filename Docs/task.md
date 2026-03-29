@@ -44,6 +44,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Solution:** Replace simple prints with a structured logging system (e.g., `os_log` on macOS, `spdlog` on Windows). Propagate detailed error enums (`FontError`, `AtlasError`) up the call stack, allowing the UI to display user‑friendly messages.
   - **Completed:** 2026-03-28. Created `Logger.swift` with `RavenLogger` enum (debug/info/warning/error/critical levels), auto‑filtering by build mode, `#fileID`/`#line` source locations. Added error types: `FontError`, `RendererError`, `PlatformError`.
 
+### Miscellaneous
+- [x] Deduplicate Rust FFI and align with `RAVEN_FRAMEWORK_DOCUMENT.md` expectations (Removed `platform_api.rs`, updated `lib.rs` exports, extracted `notification.rs`).
+
 - `[ ]` **Comprehensive Unit & Integration Tests**
   - **Problem:** The codebase lacks automated tests for layout correctness, text measurement, and accessibility mapping.
   - **Solution:** Add XCTest targets covering:

@@ -1,7 +1,7 @@
 mod platform;
-mod platform_api;
 mod clipboard;
 mod file_dialog;
+mod notification;
 
 use std::ffi::{c_char, CString};
 use std::cell::RefCell;
@@ -56,19 +56,19 @@ pub extern "C" fn raven_core_os_version() -> *mut c_char {
 // MARK: - Clipboard
 
 #[no_mangle]
-pub extern "C" fn raven_core_clipboard_get() -> *mut c_char {
+pub extern "C" fn raven_clipboard_get_text() -> *mut c_char {
     clipboard::get_text()
 }
 
 #[no_mangle]
-pub extern "C" fn raven_core_clipboard_set(text: *const c_char) -> i32 {
+pub extern "C" fn raven_clipboard_set_text(text: *const c_char) -> i32 {
     clipboard::set_text(text)
 }
 
 // MARK: - File Dialogs
 
 #[no_mangle]
-pub extern "C" fn raven_core_open_file_dialog(
+pub extern "C" fn raven_file_dialog_open(
     title: *const c_char,
     filter: *const c_char,
 ) -> *mut c_char {
@@ -76,7 +76,7 @@ pub extern "C" fn raven_core_open_file_dialog(
 }
 
 #[no_mangle]
-pub extern "C" fn raven_core_save_file_dialog(
+pub extern "C" fn raven_file_dialog_save(
     title: *const c_char,
     default_name: *const c_char,
 ) -> *mut c_char {
@@ -84,8 +84,20 @@ pub extern "C" fn raven_core_save_file_dialog(
 }
 
 #[no_mangle]
-pub extern "C" fn raven_core_select_folder_dialog(title: *const c_char) -> *mut c_char {
+pub extern "C" fn raven_file_dialog_select_folder(title: *const c_char) -> *mut c_char {
     file_dialog::select_folder(title)
+}
+
+
+// MARK: - Notifications
+
+#[no_mangle]
+pub extern "C" fn raven_notification_show(title: *const c_char, body: *const c_char) -> i32 {
+    if notification::show(title, body) {
+        0
+    } else {
+        -1
+    }
 }
 
 // MARK: - Memory Management

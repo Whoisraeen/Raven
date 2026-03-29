@@ -77,4 +77,15 @@ enum RavenCore {
         raven_core_free_string(ptr)
         return str
     }
+
+    /// Show a select-folder dialog. Returns the selected folder path, or nil if cancelled.
+    static func selectFolderDialog(title: String = "Select Folder") -> String? {
+        let result = title.withCString { titlePtr in
+            raven_file_dialog_select_folder(titlePtr)
+        }
+        guard let ptr = result else { return nil }
+        let str = String(cString: ptr)
+        raven_core_free_string(ptr)
+        return str
+    }
 }

@@ -19,6 +19,7 @@ int raven_clipboard_set_text(const char* text);
 /* Platform API - File Dialogs */
 char* raven_file_dialog_open(const char* title, const char* filter);
 char* raven_file_dialog_save(const char* title, const char* default_name);
+char* raven_file_dialog_select_folder(const char* title);
 
 /* Platform API - Notifications */
 int raven_notification_show(const char* title, const char* body);

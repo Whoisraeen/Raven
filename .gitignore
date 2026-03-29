@@ -57,3 +57,8 @@ build_log.txt
 # ─── Documentation ───
 Analysis.md
 RAVEN_FRAMEWORK_DOCUMENT.md
+
+# ─── Rust ───
+/rust/**/target/
+/rust/**/Cargo.lock
+
