@@ -12,14 +12,16 @@ char* raven_core_os_version(void);
 const char* raven_core_last_error(void);
 void raven_core_free_string(char* ptr);
 
-/* Clipboard */
-char* raven_core_clipboard_get(void);
-int raven_core_clipboard_set(const char* text);
+/* Platform API - Clipboard */
+char* raven_clipboard_get_text(void);
+int raven_clipboard_set_text(const char* text);
 
-/* File Dialogs */
-char* raven_core_open_file_dialog(const char* title, const char* filter);
-char* raven_core_save_file_dialog(const char* title, const char* default_name);
-char* raven_core_select_folder_dialog(const char* title);
+/* Platform API - File Dialogs */
+char* raven_file_dialog_open(const char* title, const char* filter);
+char* raven_file_dialog_save(const char* title, const char* default_name);
+
+/* Platform API - Notifications */
+int raven_notification_show(const char* title, const char* body);
 
 #ifdef __cplusplus
 }

@@ -326,12 +326,72 @@ To add a new primitive component:
 
 1. Create `Sources/Raven/Components/MyComponent.swift`
 2. Implement `View` with `Body = Never`
-3. Add resolution logic in `ViewResolver.resolvePrimitive()` — create a LayoutNode, set properties
-4. The layout engine handles positioning automatically
-5. RenderCollector emits the appropriate draw commands based on node properties
+3. Add any state properties to `LayoutNode`
+4. Add resolution logic in `ViewResolver.resolvePrimitive()`
+5. Add event handling in `EventDispatcher` if interactive
+6. Add accessibility role in `Accessibility.swift`
+7. The layout engine handles positioning automatically
 
-To add a new modifier:
+---
 
-1. Add a `struct MyModifier: ViewModifier` in `ViewModifiers.swift`
-2. Implement `func apply(to node: LayoutNode)` — set the relevant LayoutNode property
-3. Add the extension method on `View` — return `ModifiedView<Self, MyModifier>`
+## Theme System (`Theme.swift`)
+
+Centralized design tokens that affect all component rendering:
+
+```
+Theme.current ──► ThemeColors    (primary, surface, text, ...)
+               ──► ThemeTypography (defaultFontSize, titleFontSize, ...)
+               ──► ThemeSpacing   (xxs=2, xs=4, sm=8, md=12, lg=16, ...)
+               ──► ThemeShapes    (sm=4, md=8, lg=12, ...)
+```
+
+Ships with `.dark` (default) and `.light` presets. Components read from `Theme.current.colors.*` in their ViewResolver methods.
+
+---
+
+## Logging System (`Logger.swift`)
+
+Structured logging with severity levels:
+
+| Level | Usage |
+|-------|-------|
+| `.debug` | Detailed internal state (filtered in release) |
+| `.info` | Normal operation events |
+| `.warning` | Degraded behavior, non-critical |
+| `.error` | Operation failures |
+| `.critical` | Fatal, unrecoverable |
+
+Uses `#fileID` + `#line` for source location. Auto-filters by build mode. Supports custom handlers via `RavenLogger.customHandler`.
+
+Error types: `FontError`, `RendererError`, `PlatformError`.
+
+---
+
+## Platform Layer (`Platform/`, `rust/raven-core/`)
+
+Cross-platform OS service access via Rust FFI:
+
+```
+Swift (PlatformAPI.swift: RavenPlatform enum)
+  ↓ C FFI
+C Header (raven_core.h)
+  ↓ extern "C"
+Rust (platform_api.rs: #[cfg(target_os)] implementations)
+  ↓
+Windows: PowerShell / WinAPI
+macOS:   pbcopy / osascript
+Linux:   xclip / zenity / notify-send
+```
+
+Services: clipboard (get/set text), file dialogs (open/save), OS notifications.
+
+---
+
+## Navigation Components
+
+| Component | Architecture |
+|-----------|-------------|
+| **TabView** | VStack with content area (swapped by tab index) + bottom HStack tab bar. Tab clicks update `Binding<Int>`. |
+| **NavigationView** | VStack with HStack nav bar (title) + divider + content. |
+| **Sheet** | Applied via `SheetModifier`. When `Binding<Bool>` is true, a dimmed overlay + centered content renders on top. |
+| **Divider** | Single LayoutNode with `fixedHeight: 1` and `divider` background color. |

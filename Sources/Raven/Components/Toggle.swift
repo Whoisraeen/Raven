@@ -1,22 +1,26 @@
 // MARK: - Toggle
 
-/// A switch-style toggle control.
+/// A boolean on/off switch that toggles state on click.
 ///
 /// Usage:
 /// ```swift
-/// let isEnabled = StateVar(false)
-/// Toggle(isOn: isEnabled.binding, label: "Dark Mode")
+/// let isDarkMode = StateVar(false)
+///
+/// Toggle("Dark Mode", isOn: isDarkMode.binding)
+///     .padding(12)
 /// ```
 public struct Toggle: View {
     public typealias Body = Never
+    public var body: Never { fatalError("Toggle is a primitive view") }
 
-    let isOn: Binding<Bool>
-    let label: String
+    /// Label displayed next to the toggle switch.
+    public let label: String
 
-    public init(isOn: Binding<Bool>, label: String = "") {
-        self.isOn = isOn
+    /// Binding to the boolean state value.
+    public let isOn: Binding<Bool>
+
+    public init(_ label: String = "", isOn: Binding<Bool>) {
         self.label = label
+        self.isOn = isOn
     }
-
-    public var body: Never { fatalError("Toggle is a primitive") }
 }

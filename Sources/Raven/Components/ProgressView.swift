@@ -1,32 +1,35 @@
 // MARK: - ProgressView
 
-/// A progress indicator showing completion of a task.
+/// A progress indicator that shows completion state.
+/// Can be determinate (with a specific value) or indeterminate (spinner/pulse).
 ///
 /// Usage:
 /// ```swift
-/// // Determinate (known progress)
-/// ProgressView(value: 0.65)
+/// // Determinate — shows a filled progress bar:
+/// ProgressView("Downloading...", value: 0.65)
 ///
-/// // Indeterminate (spinner-style, not yet animated)
-/// ProgressView()
+/// // Custom total:
+/// ProgressView("Files", value: 42, total: 100)
+///
+/// // Indeterminate — shows a pulsing bar:
+/// ProgressView("Loading...")
 /// ```
 public struct ProgressView: View {
     public typealias Body = Never
+    public var body: Never { fatalError("ProgressView is a primitive view") }
 
-    let value: Float?
-    let label: String
+    /// Optional label displayed above the progress bar.
+    public let label: String
 
-    /// Create an indeterminate progress view (no specific progress).
-    public init(label: String = "") {
-        self.value = nil
+    /// Current progress value. If nil, the progress view is indeterminate.
+    public let value: Float?
+
+    /// Maximum value (default 1.0).
+    public let total: Float
+
+    public init(_ label: String = "", value: Float? = nil, total: Float = 1.0) {
         self.label = label
+        self.value = value
+        self.total = total
     }
-
-    /// Create a determinate progress view with a specific value (0.0 to 1.0).
-    public init(value: Float, label: String = "") {
-        self.value = Swift.min(Swift.max(value, 0), 1)
-        self.label = label
-    }
-
-    public var body: Never { fatalError("ProgressView is a primitive") }
 }

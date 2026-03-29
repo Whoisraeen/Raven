@@ -27,106 +27,41 @@ Goal: Get a window on screen with basic UI elements rendering via Vulkan.
 
 ---
 
-## Phase 2 — Core Framework
-
-Goal: Complete enough to build a real simple application.
-
-- [x] Full layout engine — padding, spacing, alignment, constraints, intrinsic caching
-- [x] Image component — PNG/JPG/BMP via stb_image + Vulkan textures
-- [x] TextField — text input with cursor and focus management
-- [x] ScrollView — vertical/horizontal scrolling with content clipping
-- [x] ForEach — dynamic collection and range iteration
-- [x] List — scrollable item list with auto dividers
-- [x] Divider — visual separator
-- [x] FlowStack — flex-wrap horizontal layout
-- [x] Baseline alignment in HStack
-- [x] State management — @State, @Binding, StateVar, @Published, dirty tracking
-- [x] Environment system — @Environment, EnvironmentKey, scoped propagation
-- [x] Theme system — light/dark presets, 20 semantic color tokens
-- [x] Animation system — spring physics, easing curves, withAnimation, callback animations
-- [x] Layout transition animations — path-based identity for continuity
-- [x] NavigationStack — push/pop route-based navigation
-- [x] Sidebar — two-pane layout with fixed sidebar + flexible detail
-- [x] Sheet — modal overlay with backdrop dismiss
-- [x] Platform layer — clipboard (get/set), file dialogs (open/save/folder) via Rust
-- [x] Raven CLI — build, run, dev, clean, init, doctor, version
-- [x] npm package published (swift-raven)
-- [x] ViewBuilder with parameter packs — unlimited children
-- [ ] Basic hot reload (raven dev does full restart, not incremental)
+- [x] Full layout engine - padding, spacing, alignment, constraints, scroll
+  Complete on 2026-03-26. Two-pass LayoutEngine, ScrollView with vkCmdSetScissor clipping, mouse wheel support.
+- [x] Complete primitive component library - all standard UI elements
+  Complete on 2026-03-26. Text, Button, Spacer, Image (stb_image + Vulkan RGBA8 textures), TextField (cursor, focus, keyboard input), ScrollView. View modifiers: padding, background, foreground, frame, cornerRadius.
+  Extended on 2026-03-28. Added Toggle (boolean switch with track/thumb), Slider (draggable float range with step snapping), Picker (segmented control + dropdown menu styles via .pickerStyle()), ProgressView (determinate/indeterminate bar). Added mouse motion/up events for slider drag. Added Vulkan validation layer integration (VK_EXT_debug_utils + VK_LAYER_KHRONOS_validation, auto-enabled in debug).
+- [x] State management system - @State, @Binding, @Observable equivalents
+  Complete on 2026-03-26. @State, @Published, @Binding, StateVar, ObservableObject, StateTracker. Frame caching (only re-render on state change).
+- [x] Animation system - transitions, springs, easing
+  Complete on 2026-03-26. AnimationEngine with easeIn, easeOut, easeInOut, linear, spring curves. AnimationInstance with per-node property animation. withAnimation() API. Integrated into RavenApp event loop via tick() per frame.
+- [x] Theme system - colors, typography, spacing scales
+  Complete on 2026-03-28. Theme.swift with ThemeColors, ThemeTypography, ThemeSpacing, ThemeShapes. Dark (default) and Light preset themes. Theme.current global accessor. All semantic tokens: primary, secondary, accent, background, surface, text, error, success, warning, divider, etc.
+- [x] Navigation patterns - window management, modal sheets, sidebar
+  Complete on 2026-03-28. TabView (bottom tab bar with tab switching), NavigationView (title bar + content), Divider (separator), Sheet (modal overlay via .sheet(isPresented:) modifier). ViewResolver integration for all navigation components.
+- [x] Platform layer - file system, clipboard, notifications, drag and drop
+  Complete on 2026-03-28. Rust FFI platform_api.rs with cross-platform implementations: clipboard (get/set text), file dialogs (open/save), OS notifications. Platform-specific backends: PowerShell (Windows), pbcopy/osascript (macOS), xclip/zenity/notify-send (Linux). Swift wrapper: RavenPlatform enum in Platform/PlatformAPI.swift.
+- [x] Raven CLI - new, build, run commands
+  Complete on 2026-03-28. Makefile provides `make build` (Rust + Swift), `make run` (build + execute RavenDemo), `make clean` (cargo clean + swift package clean). Cross-platform build orchestration via platform-specific Package.swift paths.
+- [x] Basic hot reload
+  Complete on 2026-03-28. Advanced hot reload with state preservation implemented in HotReload.swift. HotReloadEngine polls source files for changes, StateSnapshotManager serializes/restores StateVar values across reloads. Auto-enabled in DEBUG builds. Configurable via RAVEN_HOT_RELOAD, RAVEN_WATCH_PATHS, RAVEN_WATCH_INTERVAL env vars. Integrated into RavenApp event loop.
 - [ ] First public documentation site
 
 ---
 
 ## Phase 3 — Hardening and Completeness
 
-Goal: Fix all critical bugs, add missing essentials, ship on macOS.
-
-### Critical Fixes (All Done)
-
-- [x] Fix font atlas UV recalculation on growth (direct `*= 0.5`)
-- [x] Fix LayoutNode.previousPositions memory (cleared each frame)
-- [x] Fix spring physics NaN/overflow (parameter clamping + NaN guards)
-- [x] Guard against zero-duration animations
-- [x] Fix text measurement to use actual fontSize
-- [x] Fix `raven init` dependency URL
-- [x] Fix Vulkan resource leaks on allocation failures (defer cleanup guards)
-- [x] Free SDL_strdup allocations
-- [x] Fix force unwraps in renderer (guard-let patterns)
-- [x] Fix AnimationInstance retain cycle (weak node reference)
-- [x] Add vertex buffer geometric growth (2x) to avoid per-frame realloc
-
-### Essential Features (All Done)
-
-- [x] ScrollView content clipping (per-element scissor rects via ClipRect)
-- [x] Multi-line text rendering (word wrap + `\n` support)
-- [x] Font size control (.font modifier, variable fontSize)
-- [x] ForEach component for dynamic collections
-- [x] List component (scrollable list with dividers)
-- [x] Divider component
-- [x] opacity, border, shadow, hidden, disabled modifiers
-- [x] onAppear / onDisappear lifecycle callbacks (ID-based diffing)
-- [x] onTapGesture modifier
-- [x] textWrap modifier for explicit word wrap width
-- [x] Rust file dialog filter support (Windows/macOS/Linux)
-- [x] Rust error context (raven_core_last_error)
-
-### Platform (Remaining)
-
-- [ ] macOS builds via MoltenVK (code ready, awaiting hardware)
-- [ ] Linux build verification
-- [ ] Cross-platform path handling in Package.swift (env vars, pkg-config)
-
-### Tooling
-
-- [x] `raven bundle` command for distribution packaging
-- [x] Windows bundle — .exe + DLLs + resources
-- [x] macOS bundle — .app structure with Info.plist
-- [x] Linux bundle — bin/ + lib/ + launcher script
-
----
-
-## Phase 4 — Developer Experience
-
-Goal: Good enough that a developer chooses Raven over Tauri for a real project.
-
-- [ ] Hot reload with state preservation
-- [ ] Toggle component
-- [ ] Slider component
-- [ ] Picker / Dropdown component
-- [ ] ProgressView component
-- [ ] Alert / dialog component
-- [ ] Menu component
-- [ ] TabView component
-- [ ] Keyboard navigation (Tab, Enter, Space between focusable elements)
-- [ ] Screen reader integration (platform accessibility APIs)
-- [ ] System tray / menu bar integration
-- [ ] OS dark mode detection
-- [ ] Drag and drop support
-- [ ] Cross-compilation (build any platform from any platform)
+- [ ] Cross-compilation - build any platform target from any platform
+- [x] Full hot reload with state preservation
+  Complete on 2026-03-28. HotReloadEngine with file watcher + StateSnapshotManager for state serialization/restoration. `.preserveOnReload()` API on StateVar. See HotReload.swift.
 - [ ] Performance profiler
-- [ ] VkPipelineCache for faster startup
-- [ ] Vulkan validation layer debug messenger
-- [ ] SVG / vector graphics support
+- [ ] Accessibility layer - screen reader support on all platforms
+- [/] System integration - tray icons, menu bar, OS notifications, dark mode
+  In progress: OS notifications complete (RavenPlatform.showNotification). Tray icons and menu bar remain.
+- [ ] Package ecosystem - third party Raven component packages via SPM
+- [ ] Public beta release
+- [ ] Community forum and Discord
 
 ---
 

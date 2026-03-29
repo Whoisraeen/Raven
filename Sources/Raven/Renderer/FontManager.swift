@@ -215,17 +215,40 @@ public class FontManager: @unchecked Sendable {
         )
     }
 
+    // Text measurement cache
+    private var measurementCache: [MeasurementKey: (width: Float, height: Float)] = [:]
+    private let measurementLock = NSLock()
+
+    /// Invalidate the text measurement cache (called when font changes).
+    public func invalidateMeasurementCache() {
+        measurementLock.lock()
+        defer { measurementLock.unlock() }
+        measurementCache.removeAll()
+    }
+
     /// Measure the width and height of a string at a given font size.
-    /// Supports multi-line text via `\n` and optional word wrapping via `maxWidth`.
-    public func measureText(_ text: String, fontSize: Float, maxWidth: Float = 0) -> (width: Float, height: Float) {
+    /// Results are cached for repeated calls with the same text and size.
+    public func measureText(_ text: String, fontSize: Float) -> (width: Float, height: Float) {
+        let key = MeasurementKey(text: text, fontSize: fontSize)
+
+        // Check cache first
+        measurementLock.lock()
+        if let cached = measurementCache[key] {
+            measurementLock.unlock()
+            return cached
+        }
+        measurementLock.unlock()
+
         let metrics = getMetrics(fontSize: fontSize)
         let lineHeight = metrics.lineHeight
 
         guard fontLoaded else {
-            // Fallback: handle newlines in approximation
-            let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
-            let maxLineWidth = lines.map { Float($0.count) * (fontSize / 2.0) }.max() ?? 0
-            return (width: maxLineWidth, height: lineHeight * Float(max(lines.count, 1)))
+            // Fallback to monospace 8px-based approximation for the fallback font
+            let result = (width: Float(text.count) * (fontSize / 2.0), height: height)
+            measurementLock.lock()
+            measurementCache[key] = result
+            measurementLock.unlock()
+            return result
         }
 
         let scale = stbtt_ScaleForPixelHeight(&fontInfo, fontSize)
@@ -286,8 +309,14 @@ public class FontManager: @unchecked Sendable {
             prevCodepoint = cp
         }
 
-        maxLineWidth = max(maxLineWidth, lineWidth)
-        return (width: maxLineWidth, height: lineHeight * lineCount)
+        let result = (width: width, height: height)
+
+        // Store in cache
+        measurementLock.lock()
+        measurementCache[key] = result
+        measurementLock.unlock()
+
+        return result
     }
 
     // MARK: - Atlas Access
@@ -397,3 +426,19 @@ public struct FontMetrics {
     public var lineGap: Float
     public var lineHeight: Float { ascent + descent + lineGap }
 }
+
+/// Cache key for text measurement results.
+struct MeasurementKey: Hashable {
+    let text: String
+    let fontSize: Float
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(text)
+        hasher.combine(Int(fontSize * 10))
+    }
+
+    static func == (lhs: MeasurementKey, rhs: MeasurementKey) -> Bool {
+        lhs.text == rhs.text && Int(lhs.fontSize * 10) == Int(rhs.fontSize * 10)
+    }
+}
+

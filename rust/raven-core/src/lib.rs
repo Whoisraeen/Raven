@@ -1,6 +1,5 @@
 mod platform;
-mod clipboard;
-mod file_dialog;
+mod platform_api;
 
 use std::ffi::{c_char, CString};
 use std::cell::RefCell;

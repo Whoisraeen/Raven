@@ -1,48 +1,58 @@
 // MARK: - Sheet (Modal Overlay)
 
-/// A modal overlay that appears on top of the current content.
-/// Controlled by a boolean binding — set to true to present, false to dismiss.
+/// A modal sheet that overlays content on top of the current view.
+/// Controlled by a boolean binding that determines visibility.
 ///
 /// Usage:
 /// ```swift
-/// @State var showSettings = false
+/// let showSettings = StateVar(false)
 ///
-/// var body: some View {
-///     ZStack {
-///         Button("Open Settings") { showSettings = true }
-///
-///         Sheet(isPresented: $showSettings) {
-///             VStack {
-///                 Text("Settings")
-///                 Button("Close") { showSettings = false }
-///             }
-///             .padding(24)
-///             .background(.surface)
-///             .cornerRadius(12)
-///         }
+/// VStack {
+///     Button("Open Settings") { showSettings.value = true }
+/// }
+/// .sheet(isPresented: showSettings.binding) {
+///     VStack {
+///         Text("Settings")
+///         Button("Close") { showSettings.value = false }
 ///     }
+///     .padding(24)
+///     .background(.surface)
+///     .cornerRadius(12)
 /// }
 /// ```
 public struct Sheet: View {
     public typealias Body = Never
     public var body: Never { fatalError("Sheet is a primitive view") }
 
+    /// Binding that controls whether the sheet is visible.
     public let isPresented: Binding<Bool>
-    internal let sheetContent: [any View]
 
-    /// Width and height of the sheet (nil = auto-size from content).
-    public let sheetWidth: Float?
-    public let sheetHeight: Float?
+    /// The content of the sheet.
+    public let content: [any View]
 
-    public init(
-        isPresented: Binding<Bool>,
-        width: Float? = nil,
-        height: Float? = nil,
-        @ViewBuilder content: () -> some View
-    ) {
+    public init(isPresented: Binding<Bool>, content: [any View]) {
         self.isPresented = isPresented
-        self.sheetWidth = width
-        self.sheetHeight = height
-        self.sheetContent = [content()]
+        self.content = content
+    }
+}
+
+/// Modifier to attach a sheet to any view.
+public struct SheetModifier: ViewModifier {
+    public let isPresented: Binding<Bool>
+    public let sheetContent: [any View]
+
+    public func apply(to node: LayoutNode) {
+        node.hasSheet = true
+        node.sheetIsPresented = isPresented
+    }
+}
+
+extension View {
+    /// Present a modal sheet overlay when `isPresented` is true.
+    public func sheet<Content: View>(isPresented: Binding<Bool>, @ViewBuilder content: () -> Content) -> ModifiedView<Self, SheetModifier> {
+        ModifiedView(
+            content: self,
+            modifier: SheetModifier(isPresented: isPresented, sheetContent: [content()])
+        )
     }
 }

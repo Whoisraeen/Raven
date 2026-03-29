@@ -75,6 +75,34 @@ public enum ViewResolver {
             return node
         }
 
+        // Toggle
+        if let toggle = view as? Toggle {
+            let node = resolveToggle(toggle, path: path)
+            node.id = path
+            return node
+        }
+
+        // Slider
+        if let slider = view as? Slider {
+            let node = resolveSlider(slider, path: path)
+            node.id = path
+            return node
+        }
+
+        // Picker
+        if let picker = view as? Picker {
+            let node = resolvePicker(picker, path: path)
+            node.id = path
+            return node
+        }
+
+        // ProgressView
+        if let progressView = view as? ProgressView {
+            let node = resolveProgressView(progressView, path: path)
+            node.id = path
+            return node
+        }
+
         // VStack
         if let vstack = view as? VStack {
             let node = resolveVStack(vstack, path: path)
@@ -103,89 +131,23 @@ public enum ViewResolver {
             return node
         }
 
-        // NavigationStack
-        if let navStack = view as? NavigationStack {
-            let node = resolveNavigationStack(navStack, path: path)
+        // TabView
+        if let tabView = view as? TabView {
+            let node = resolveTabView(tabView, path: path)
             node.id = path
             return node
         }
 
-        // Sidebar
-        if let sidebar = view as? Sidebar {
-            let node = resolveSidebar(sidebar, path: path)
-            node.id = path
-            return node
-        }
-
-        // SidebarItem
-        if let item = view as? SidebarItem {
-            let node = resolveSidebarItem(item)
-            node.id = path
-            return node
-        }
-
-        // Sheet
-        if let sheet = view as? Sheet {
-            let node = resolveSheet(sheet, path: path)
-            node.id = path
-            return node
-        }
-
-        // ForEach
-        if let forEach = view as? AnyForEachView {
-            let node = forEach.resolveForEach(path: path)
-            node.id = path
-            return node
-        }
-
-        // List
-        if let list = view as? AnyListView {
-            let node = list.resolveList(path: path)
-            node.id = path
-            return node
-        }
-
-        // Toggle
-        if let toggle = view as? Toggle {
-            let node = resolveToggle(toggle)
-            node.id = path
-            return node
-        }
-
-        // Slider
-        if let slider = view as? Slider {
-            let node = resolveSlider(slider, path: path)
-            node.id = path
-            return node
-        }
-
-        // Picker
-        if let picker = view as? Picker {
-            let node = resolvePicker(picker, path: path)
-            node.id = path
-            return node
-        }
-
-        // ProgressView
-        if let progress = view as? ProgressView {
-            let node = resolveProgressView(progress)
+        // NavigationView
+        if let navView = view as? NavigationView {
+            let node = resolveNavigationView(navView, path: path)
             node.id = path
             return node
         }
 
         // Divider
         if view is Divider {
-            let theme = EnvironmentStore.shared.current.theme
-            let node = LayoutNode()
-            node.fixedHeight = theme.dividerHeight
-            node.backgroundColor = theme.divider
-            node.id = path
-            return node
-        }
-
-        // FlowStack
-        if let flowStack = view as? FlowStack {
-            let node = resolveFlowStack(flowStack, path: path)
+            let node = resolveDivider()
             node.id = path
             return node
         }
@@ -235,14 +197,9 @@ public enum ViewResolver {
 
         let textNode = LayoutNode()
         textNode.text = button.label
-        textNode.foregroundColor = theme.buttonText
-        textNode.padding = EdgeInsets(
-            top: theme.buttonPaddingVertical,
-            leading: theme.buttonPaddingHorizontal,
-            bottom: theme.buttonPaddingVertical,
-            trailing: theme.buttonPaddingHorizontal
-        )
-
+        textNode.foregroundColor = .buttonText
+        textNode.padding = EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+        
         node.children = [textNode]
         node.accessibilityRole = .button
         node.accessibilityLabel = button.label
@@ -285,6 +242,330 @@ public enum ViewResolver {
         node.accessibilityValue = textField.text.wrappedValue
 
         if node.fixedWidth == nil { node.fixedWidth = theme.textFieldDefaultWidth }
+        return node
+    }
+
+    // MARK: - Toggle
+
+    private static func resolveToggle(_ toggle: Toggle, path: String) -> LayoutNode {
+        let node = LayoutNode()
+        node.stackAxis = .horizontal
+        node.spacing = 10
+        node.verticalAlignment = .center
+        node.isToggle = true
+        node.toggleBinding = toggle.isOn
+        node.accessibilityRole = .toggle
+        node.accessibilityLabel = toggle.label
+        node.accessibilityValue = toggle.isOn.wrappedValue ? "on" : "off"
+
+        // Label text
+        if !toggle.label.isEmpty {
+            let labelNode = LayoutNode()
+            labelNode.text = toggle.label
+            labelNode.foregroundColor = .text
+            labelNode.id = "\(path).tl"
+            node.children.append(labelNode)
+        }
+
+        // Track (the pill-shaped background)
+        let isOn = toggle.isOn.wrappedValue
+        let trackNode = LayoutNode()
+        trackNode.fixedWidth = 44
+        trackNode.fixedHeight = 24
+        trackNode.cornerRadius = 12
+        trackNode.backgroundColor = isOn ? .primary : .trackBackground
+        trackNode.id = "\(path).tt"
+
+        // Thumb (the circle that slides)
+        let thumbNode = LayoutNode()
+        thumbNode.fixedWidth = 18
+        thumbNode.fixedHeight = 18
+        thumbNode.cornerRadius = 9
+        thumbNode.backgroundColor = .thumbColor
+        // Position thumb: left (off) or right (on)
+        thumbNode.padding = EdgeInsets(
+            top: 3,
+            leading: isOn ? 23 : 3,
+            bottom: 3,
+            trailing: isOn ? 3 : 23
+        )
+        thumbNode.id = "\(path).th"
+
+        trackNode.children = [thumbNode]
+        node.children.append(trackNode)
+
+        return node
+    }
+
+    // MARK: - Slider
+
+    private static func resolveSlider(_ slider: Slider, path: String) -> LayoutNode {
+        let node = LayoutNode()
+        node.isSlider = true
+        node.sliderBinding = slider.value
+        node.sliderRange = slider.range
+        node.sliderStep = slider.step
+        node.fixedWidth = 200
+        node.fixedHeight = 24
+        node.accessibilityRole = .slider
+        let pct = (slider.value.wrappedValue - slider.range.lowerBound) / (slider.range.upperBound - slider.range.lowerBound)
+        node.accessibilityValue = String(format: "%.0f%%", pct * 100)
+
+        // Track background (full width, 4px tall, centered)
+        let trackNode = LayoutNode()
+        trackNode.fixedWidth = 200
+        trackNode.fixedHeight = 4
+        trackNode.cornerRadius = 2
+        trackNode.backgroundColor = .trackBackground
+        trackNode.padding = EdgeInsets(top: 10, leading: 0, bottom: 10, trailing: 0)
+        trackNode.id = "\(path).st"
+
+        // Filled portion of the track
+        let clampedPct = min(max(pct, 0), 1)
+        let filledWidth = 200 * clampedPct
+        let filledNode = LayoutNode()
+        filledNode.fixedWidth = filledWidth
+        filledNode.fixedHeight = 4
+        filledNode.cornerRadius = 2
+        filledNode.backgroundColor = .primary
+        filledNode.padding = EdgeInsets(top: 10, leading: 0, bottom: 10, trailing: 0)
+        filledNode.id = "\(path).sf"
+
+        // Thumb
+        let thumbNode = LayoutNode()
+        thumbNode.fixedWidth = 16
+        thumbNode.fixedHeight = 16
+        thumbNode.cornerRadius = 8
+        thumbNode.backgroundColor = .thumbColor
+        thumbNode.id = "\(path).sh"
+
+        node.children = [trackNode, filledNode, thumbNode]
+        return node
+    }
+
+    // MARK: - Picker
+
+    private static func resolvePicker(_ picker: Picker, path: String) -> LayoutNode {
+        let node = LayoutNode()
+        node.isPicker = true
+        node.pickerBinding = picker.selection
+        node.pickerOptions = picker.options
+        node.pickerStyle = picker.style
+        node.accessibilityRole = .picker
+        node.accessibilityLabel = picker.label
+        if picker.selection.wrappedValue >= 0 && picker.selection.wrappedValue < picker.options.count {
+            node.accessibilityValue = picker.options[picker.selection.wrappedValue]
+        }
+
+        switch picker.style {
+        case .segmented:
+            return resolveSegmentedPicker(picker, node: node, path: path)
+        case .menu:
+            return resolveMenuPicker(picker, node: node, path: path)
+        }
+    }
+
+    private static func resolveSegmentedPicker(_ picker: Picker, node: LayoutNode, path: String) -> LayoutNode {
+        // Horizontal container with segment buttons
+        node.stackAxis = .horizontal
+        node.spacing = 0
+        node.backgroundColor = .trackBackground
+        node.cornerRadius = 8
+        node.padding = EdgeInsets(2)
+
+        // Optional label above the control
+        var container = node
+        if !picker.label.isEmpty {
+            let wrapper = LayoutNode()
+            wrapper.stackAxis = .vertical
+            wrapper.spacing = 6
+            wrapper.id = "\(path).pw"
+
+            let labelNode = LayoutNode()
+            labelNode.text = picker.label
+            labelNode.foregroundColor = .textSecondary
+            labelNode.id = "\(path).pl"
+
+            wrapper.children = [labelNode, node]
+            container = wrapper
+        }
+
+        for (index, option) in picker.options.enumerated() {
+            let isSelected = index == picker.selection.wrappedValue
+
+            let segmentNode = LayoutNode()
+            segmentNode.isPicker = true
+            segmentNode.pickerBinding = picker.selection
+            segmentNode.pickerSegmentIndex = index
+            segmentNode.pickerOptions = picker.options
+            segmentNode.backgroundColor = isSelected ? .primary : .clear
+            segmentNode.cornerRadius = 6
+            segmentNode.id = "\(path).ps\(index)"
+
+            let textNode = LayoutNode()
+            textNode.text = option
+            textNode.foregroundColor = isSelected ? .buttonText : .text
+            textNode.padding = EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14)
+            textNode.id = "\(path).pst\(index)"
+
+            segmentNode.children = [textNode]
+            node.children.append(segmentNode)
+        }
+
+        return container
+    }
+
+    private static func resolveMenuPicker(_ picker: Picker, node: LayoutNode, path: String) -> LayoutNode {
+        // Vertical container: trigger button + dropdown list
+        node.stackAxis = .vertical
+        node.spacing = 0
+
+        // Determine the currently selected text
+        let selectedIndex = picker.selection.wrappedValue
+        let selectedText = (selectedIndex >= 0 && selectedIndex < picker.options.count)
+            ? picker.options[selectedIndex] : "Select..."
+
+        // Trigger button (shows current selection + dropdown indicator)
+        let triggerNode = LayoutNode()
+        triggerNode.isPicker = true
+        triggerNode.pickerBinding = picker.selection
+        triggerNode.pickerOptions = picker.options
+        triggerNode.pickerSegmentIndex = -1  // Marks this as the trigger
+        triggerNode.isPickerExpanded = false
+        triggerNode.backgroundColor = .surface
+        triggerNode.cornerRadius = 6
+        triggerNode.id = "\(path).pt"
+
+        let triggerContent = LayoutNode()
+        triggerContent.stackAxis = .horizontal
+        triggerContent.spacing = 8
+        triggerContent.id = "\(path).ptc"
+
+        // Label (optional)
+        if !picker.label.isEmpty {
+            let labelNode = LayoutNode()
+            labelNode.text = picker.label
+            labelNode.foregroundColor = .textSecondary
+            labelNode.padding = EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 0)
+            labelNode.id = "\(path).ptl"
+            triggerContent.children.append(labelNode)
+        }
+
+        let valueNode = LayoutNode()
+        valueNode.text = selectedText
+        valueNode.foregroundColor = .text
+        valueNode.padding = EdgeInsets(top: 8, leading: picker.label.isEmpty ? 12 : 4, bottom: 8, trailing: 4)
+        valueNode.id = "\(path).ptv"
+
+        let arrowNode = LayoutNode()
+        arrowNode.text = "▾"
+        arrowNode.foregroundColor = .textSecondary
+        arrowNode.padding = EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 12)
+        arrowNode.id = "\(path).pta"
+
+        triggerContent.children.append(valueNode)
+        triggerContent.children.append(arrowNode)
+        triggerNode.children = [triggerContent]
+        node.children.append(triggerNode)
+
+        // Dropdown list (only visible when expanded)
+        // The expanded state is managed by the EventDispatcher;
+        // we always emit the option nodes but they are hidden unless expanded.
+        // For now, we use the picker node's isPickerExpanded property.
+        // The rendering will be controlled by checking this flag.
+        if node.isPickerExpanded {
+            let dropdownNode = LayoutNode()
+            dropdownNode.stackAxis = .vertical
+            dropdownNode.spacing = 0
+            dropdownNode.backgroundColor = .surface
+            dropdownNode.cornerRadius = 6
+            dropdownNode.padding = EdgeInsets(top: 2, leading: 0, bottom: 2, trailing: 0)
+            dropdownNode.id = "\(path).pd"
+
+            for (index, option) in picker.options.enumerated() {
+                let isSelected = index == selectedIndex
+                let optionNode = LayoutNode()
+                optionNode.isPicker = true
+                optionNode.pickerBinding = picker.selection
+                optionNode.pickerSegmentIndex = index
+                optionNode.pickerOptions = picker.options
+                optionNode.backgroundColor = isSelected ? .primary : .clear
+                optionNode.id = "\(path).po\(index)"
+
+                let optionText = LayoutNode()
+                optionText.text = option
+                optionText.foregroundColor = isSelected ? .buttonText : .text
+                optionText.padding = EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
+                optionText.id = "\(path).pot\(index)"
+
+                optionNode.children = [optionText]
+                dropdownNode.children.append(optionNode)
+            }
+
+            node.children.append(dropdownNode)
+        }
+
+        return node
+    }
+
+    // MARK: - ProgressView
+
+    private static func resolveProgressView(_ progressView: ProgressView, path: String) -> LayoutNode {
+        let node = LayoutNode()
+        node.isProgressView = true
+        node.progressValue = progressView.value
+        node.progressTotal = progressView.total
+        node.stackAxis = .vertical
+        node.spacing = 4
+        node.accessibilityRole = .progressBar
+        if let val = progressView.value {
+            let pct = min(val / progressView.total, 1.0) * 100
+            node.accessibilityValue = String(format: "%.0f%%", pct)
+        } else {
+            node.accessibilityValue = "indeterminate"
+        }
+
+        // Label (if provided)
+        if !progressView.label.isEmpty {
+            let labelNode = LayoutNode()
+            labelNode.text = progressView.label
+            labelNode.foregroundColor = .textSecondary
+            labelNode.id = "\(path).pvl"
+            node.children.append(labelNode)
+        }
+
+        // Track background
+        let trackNode = LayoutNode()
+        trackNode.fixedWidth = 200
+        trackNode.fixedHeight = 6
+        trackNode.cornerRadius = 3
+        trackNode.backgroundColor = .trackBackground
+        trackNode.id = "\(path).pvt"
+
+        // Filled bar
+        if let val = progressView.value {
+            let pct = min(max(val / progressView.total, 0), 1)
+            let filledNode = LayoutNode()
+            filledNode.fixedWidth = 200 * pct
+            filledNode.fixedHeight = 6
+            filledNode.cornerRadius = 3
+            filledNode.backgroundColor = .primary
+            filledNode.id = "\(path).pvf"
+            trackNode.children = [filledNode]
+        }
+
+        node.children.append(trackNode)
+
+        // Percentage text
+        if let val = progressView.value {
+            let pct = min(val / progressView.total, 1.0) * 100
+            let pctNode = LayoutNode()
+            pctNode.text = String(format: "%.0f%%", pct)
+            pctNode.foregroundColor = .textSecondary
+            pctNode.id = "\(path).pvp"
+            node.children.append(pctNode)
+        }
+
         return node
     }
 
@@ -333,369 +614,112 @@ public enum ViewResolver {
         return resolveImpl(view)
     }
 
-    // MARK: - NavigationStack
+    // MARK: - TabView
 
-    private static func resolveNavigationStack(_ nav: NavigationStack, path: String) -> LayoutNode {
+    private static func resolveTabView(_ tabView: TabView, path: String) -> LayoutNode {
         let node = LayoutNode()
-        node.stackAxis = .zStack
+        node.stackAxis = .vertical
+        node.tabSelection = tabView.selection
+        node.tabLabels = tabView.tabs.map { $0.label }
 
-        if let currentRoute = nav.path.current, let builder = nav.destinations[currentRoute] {
-            // Show the destination for the current route
-            let destView = builder()
-            let child = resolveAnyView(destView, path: "\(path).nav.\(currentRoute)")
-            node.children = [child]
-        } else {
-            // Show root content
-            let children = nav.rootContent.enumerated().map { index, child in
-                resolveAnyView(child, path: "\(path).nav.root.\(index)")
-            }
-            node.children = children
-        }
-
-        return node
-    }
-
-    // MARK: - Sidebar
-
-    private static func resolveSidebar(_ sidebar: Sidebar, path: String) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
-
-        // Root is a horizontal layout
-        let node = LayoutNode()
-        node.stackAxis = .horizontal
-        node.spacing = 0
-
-        // Sidebar pane (fixed width)
-        let sidebarNode = LayoutNode()
-        sidebarNode.stackAxis = .vertical
-        sidebarNode.spacing = 0
-        sidebarNode.fixedWidth = sidebar.sidebarWidth
-        sidebarNode.backgroundColor = theme.sidebarBackground
-        sidebarNode.padding = EdgeInsets(top: theme.sidebarPaddingVertical, leading: 0, bottom: theme.sidebarPaddingVertical, trailing: 0)
-        sidebarNode.id = "\(path).sidebar"
-        sidebarNode.children = sidebar.sidebarContent.enumerated().map { index, child in
-            resolveAnyView(child, path: "\(path).sb.\(index)")
-        }
-
-        // Detail pane (fills remaining space)
-        let detailNode = LayoutNode()
-        detailNode.stackAxis = .vertical
-        detailNode.spacing = 0
-        detailNode.isFlexible = true
-        detailNode.backgroundColor = theme.background
-        detailNode.id = "\(path).detail"
-        detailNode.children = sidebar.detailContent.enumerated().map { index, child in
-            resolveAnyView(child, path: "\(path).dt.\(index)")
-        }
-
-        node.children = [sidebarNode, detailNode]
-        return node
-    }
-
-    // MARK: - SidebarItem
-
-    private static func resolveSidebarItem(_ item: SidebarItem) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
-
-        let node = LayoutNode()
-        node.onTap = item.action
-        node.backgroundColor = item.isSelected ? theme.sidebarSelection : nil
-        node.padding = EdgeInsets(
-            top: theme.sidebarItemPaddingVertical,
-            leading: theme.sidebarItemPaddingHorizontal,
-            bottom: theme.sidebarItemPaddingVertical,
-            trailing: theme.sidebarItemPaddingHorizontal
-        )
-        node.accessibilityRole = .button
-        node.accessibilityLabel = item.label
-
-        let textNode = LayoutNode()
-        textNode.text = item.label
-        textNode.foregroundColor = item.isSelected ? theme.text : theme.sidebarText
-        node.children = [textNode]
-
-        return node
-    }
-
-    // MARK: - Sheet
-
-    private static func resolveSheet(_ sheet: Sheet, path: String) -> LayoutNode {
-        // If not presented, return empty node
-        guard sheet.isPresented.wrappedValue else {
-            let node = LayoutNode()
-            node.id = path
-            return node
-        }
-
-        let theme = EnvironmentStore.shared.current.theme
-
-        // Overlay container (ZStack-like, fills viewport)
-        let node = LayoutNode()
-        node.stackAxis = .zStack
-
-        // Semi-transparent backdrop
-        let backdrop = LayoutNode()
-        backdrop.backgroundColor = Color(0, 0, 0, 0.5)
-        backdrop.isFlexible = true
-        let binding = sheet.isPresented
-        backdrop.onTap = { binding.wrappedValue = false }
-        backdrop.id = "\(path).backdrop"
-
-        // Sheet content container
+        // Content area — show the selected tab's content
         let contentNode = LayoutNode()
         contentNode.stackAxis = .vertical
-        contentNode.spacing = 0
-        contentNode.backgroundColor = theme.surface
-        contentNode.cornerRadius = theme.sheetCornerRadius
-        contentNode.padding = EdgeInsets(theme.sheetPadding)
-        if let w = sheet.sheetWidth { contentNode.fixedWidth = w }
-        if let h = sheet.sheetHeight { contentNode.fixedHeight = h }
-        contentNode.id = "\(path).content"
-        contentNode.accessibilityRole = .window
-        contentNode.children = sheet.sheetContent.enumerated().map { index, child in
-            resolveAnyView(child, path: "\(path).sc.\(index)")
-        }
+        contentNode.id = "\(path).tc"
 
-        node.children = [backdrop, contentNode]
-        return node
-    }
-
-    // MARK: - Toggle
-
-    private static func resolveToggle(_ toggle: Toggle) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
-        let isOn = toggle.isOn.wrappedValue
-
-        // Root: horizontal layout [label] [track]
-        let node = LayoutNode()
-        node.stackAxis = .horizontal
-        node.spacing = 8
-        node.verticalAlignment = .center
-
-        if !toggle.label.isEmpty {
-            let labelNode = LayoutNode()
-            labelNode.text = toggle.label
-            labelNode.foregroundColor = theme.text
-            node.children.append(labelNode)
-        }
-
-        // Track background
-        let trackNode = LayoutNode()
-        trackNode.fixedWidth = 44
-        trackNode.fixedHeight = 24
-        trackNode.cornerRadius = 12
-        trackNode.backgroundColor = isOn ? theme.primary : theme.surfaceLight
-        trackNode.stackAxis = .zStack
-
-        // Thumb (knob)
-        let thumbNode = LayoutNode()
-        thumbNode.fixedWidth = 20
-        thumbNode.fixedHeight = 20
-        thumbNode.cornerRadius = 10
-        thumbNode.backgroundColor = .white
-        thumbNode.padding = EdgeInsets(top: 2, leading: isOn ? 22 : 2, bottom: 2, trailing: isOn ? 2 : 22)
-
-        trackNode.children = [thumbNode]
-
-        let binding = toggle.isOn
-        trackNode.onTap = { binding.wrappedValue = !binding.wrappedValue }
-        trackNode.accessibilityRole = .button
-        trackNode.accessibilityLabel = toggle.label.isEmpty ? "Toggle" : toggle.label
-        trackNode.accessibilityValue = isOn ? "on" : "off"
-
-        node.children.append(trackNode)
-        return node
-    }
-
-    // MARK: - Slider
-
-    private static func resolveSlider(_ slider: Slider, path: String) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
-        let value = slider.value.wrappedValue
-        let fraction = slider.max > slider.min ? (value - slider.min) / (slider.max - slider.min) : 0
-
-        let node = LayoutNode()
-        node.stackAxis = .vertical
-        node.spacing = 4
-
-        if !slider.label.isEmpty {
-            let labelNode = LayoutNode()
-            labelNode.text = slider.label
-            labelNode.foregroundColor = theme.textSecondary
-            node.children.append(labelNode)
-        }
-
-        // Track
-        let trackWidth: Float = 200
-        let trackNode = LayoutNode()
-        trackNode.fixedWidth = trackWidth
-        trackNode.fixedHeight = 6
-        trackNode.cornerRadius = 3
-        trackNode.backgroundColor = theme.surfaceLight
-        trackNode.stackAxis = .zStack
-
-        // Filled portion
-        let fillWidth = max(trackWidth * fraction, 6)
-        let fillNode = LayoutNode()
-        fillNode.fixedWidth = fillWidth
-        fillNode.fixedHeight = 6
-        fillNode.cornerRadius = 3
-        fillNode.backgroundColor = theme.primary
-
-        trackNode.children = [fillNode]
-
-        // Thumb indicator (positioned along the track)
-        let thumbNode = LayoutNode()
-        thumbNode.fixedWidth = 16
-        thumbNode.fixedHeight = 16
-        thumbNode.cornerRadius = 8
-        thumbNode.backgroundColor = theme.primary
-        let thumbOffset = (trackWidth - 16) * fraction
-        thumbNode.padding = EdgeInsets(top: 0, leading: thumbOffset, bottom: 0, trailing: 0)
-
-        let sliderContainer = LayoutNode()
-        sliderContainer.stackAxis = .zStack
-        sliderContainer.fixedWidth = trackWidth
-        sliderContainer.fixedHeight = 16
-        sliderContainer.children = [trackNode, thumbNode]
-
-        sliderContainer.accessibilityRole = .none
-        sliderContainer.accessibilityLabel = slider.label.isEmpty ? "Slider" : slider.label
-        sliderContainer.accessibilityValue = String(format: "%.1f", value)
-
-        node.children.append(sliderContainer)
-        return node
-    }
-
-    // MARK: - Picker
-
-    private static func resolvePicker(_ picker: Picker, path: String) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
-        let selectedIndex = picker.selection.wrappedValue
-
-        let node = LayoutNode()
-        node.stackAxis = .vertical
-        node.spacing = 4
-
-        if !picker.label.isEmpty {
-            let labelNode = LayoutNode()
-            labelNode.text = picker.label
-            labelNode.foregroundColor = theme.textSecondary
-            node.children.append(labelNode)
-        }
-
-        // Display current selection as a button-like element
-        let displayNode = LayoutNode()
-        displayNode.stackAxis = .horizontal
-        displayNode.spacing = 8
-        displayNode.backgroundColor = theme.inputBackground
-        displayNode.cornerRadius = theme.textFieldCornerRadius
-        displayNode.padding = EdgeInsets(
-            top: theme.textFieldPaddingVertical,
-            leading: theme.textFieldPaddingHorizontal,
-            bottom: theme.textFieldPaddingVertical,
-            trailing: theme.textFieldPaddingHorizontal
-        )
-        displayNode.fixedWidth = theme.textFieldDefaultWidth
-
-        let textNode = LayoutNode()
-        let selectedText = (selectedIndex >= 0 && selectedIndex < picker.options.count)
-            ? picker.options[selectedIndex] : ""
-        textNode.text = selectedText
-        textNode.foregroundColor = theme.text
-
-        let arrowNode = LayoutNode()
-        arrowNode.text = "▼"
-        arrowNode.foregroundColor = theme.textSecondary
-        arrowNode.isFlexible = false
-
-        displayNode.children = [textNode, LayoutNode.spacerNode(), arrowNode]
-
-        // Cycle through options on tap
-        let binding = picker.selection
-        let optionCount = picker.options.count
-        displayNode.onTap = {
-            if optionCount > 0 {
-                binding.wrappedValue = (binding.wrappedValue + 1) % optionCount
+        let selectedIndex = tabView.selection.wrappedValue
+        if selectedIndex >= 0 && selectedIndex < tabView.tabs.count {
+            let tab = tabView.tabs[selectedIndex]
+            contentNode.children = tab.content.enumerated().map { index, child in
+                resolveAnyView(child, path: "\(path).t\(selectedIndex).\(index)")
             }
         }
-        displayNode.accessibilityRole = .button
-        displayNode.accessibilityLabel = picker.label.isEmpty ? "Picker" : picker.label
-        displayNode.accessibilityValue = selectedText
 
-        node.children.append(displayNode)
+        // Tab bar at the bottom
+        let tabBarNode = LayoutNode()
+        tabBarNode.stackAxis = .horizontal
+        tabBarNode.spacing = 0
+        tabBarNode.backgroundColor = Theme.current.colors.surface
+        tabBarNode.id = "\(path).tb"
+
+        for (index, tab) in tabView.tabs.enumerated() {
+            let tabNode = LayoutNode()
+            tabNode.text = tab.label
+            tabNode.foregroundColor = index == selectedIndex
+                ? Theme.current.colors.primary
+                : Theme.current.colors.textSecondary
+            tabNode.padding = EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+            tabNode.id = "\(path).tb\(index)"
+            tabNode.isSpacer = true  // flex equally
+            tabNode.onTap = { [selection = tabView.selection, idx = index] in
+                selection.wrappedValue = idx
+            }
+            tabBarNode.children.append(tabNode)
+        }
+
+        // Divider above tab bar
+        let dividerNode = LayoutNode()
+        dividerNode.isDivider = true
+        dividerNode.fixedHeight = 1
+        dividerNode.backgroundColor = Theme.current.colors.divider
+        dividerNode.id = "\(path).td"
+
+        // Content takes up remaining space
+        let spacerNode = LayoutNode()
+        spacerNode.isSpacer = true
+        spacerNode.id = "\(path).ts"
+
+        node.children = [contentNode, spacerNode, dividerNode, tabBarNode]
+        node.accessibilityRole = .none
         return node
     }
 
-    // MARK: - ProgressView
+    // MARK: - NavigationView
 
-    private static func resolveProgressView(_ progress: ProgressView) -> LayoutNode {
-        let theme = EnvironmentStore.shared.current.theme
-
+    private static func resolveNavigationView(_ navView: NavigationView, path: String) -> LayoutNode {
         let node = LayoutNode()
         node.stackAxis = .vertical
-        node.spacing = 4
+        node.navigationTitle = navView.title
 
-        if !progress.label.isEmpty {
-            let labelNode = LayoutNode()
-            labelNode.text = progress.label
-            labelNode.foregroundColor = theme.textSecondary
-            node.children.append(labelNode)
+        // Navigation bar
+        let navBar = LayoutNode()
+        navBar.stackAxis = .horizontal
+        navBar.backgroundColor = Theme.current.colors.surface
+        navBar.padding = EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16)
+        navBar.id = "\(path).nb"
+
+        let titleNode = LayoutNode()
+        titleNode.text = navView.title
+        titleNode.foregroundColor = Theme.current.colors.text
+        titleNode.id = "\(path).nt"
+        navBar.children = [titleNode]
+
+        // Divider
+        let dividerNode = LayoutNode()
+        dividerNode.isDivider = true
+        dividerNode.fixedHeight = 1
+        dividerNode.backgroundColor = Theme.current.colors.divider
+        dividerNode.id = "\(path).nd"
+
+        // Content
+        let contentNode = LayoutNode()
+        contentNode.stackAxis = .vertical
+        contentNode.id = "\(path).nc"
+        contentNode.children = navView.content.enumerated().map { index, child in
+            resolveAnyView(child, path: "\(path).n\(index)")
         }
 
-        if let value = progress.value {
-            // Determinate progress bar
-            let trackWidth: Float = 200
-            let trackNode = LayoutNode()
-            trackNode.fixedWidth = trackWidth
-            trackNode.fixedHeight = 8
-            trackNode.cornerRadius = 4
-            trackNode.backgroundColor = theme.surfaceLight
-            trackNode.stackAxis = .zStack
-
-            let fillWidth = max(trackWidth * value, 4)
-            let fillNode = LayoutNode()
-            fillNode.fixedWidth = fillWidth
-            fillNode.fixedHeight = 8
-            fillNode.cornerRadius = 4
-            fillNode.backgroundColor = theme.primary
-
-            trackNode.children = [fillNode]
-            trackNode.accessibilityRole = .none
-            trackNode.accessibilityValue = "\(Int(value * 100))%"
-
-            node.children.append(trackNode)
-        } else {
-            // Indeterminate: show a static indicator (animation TBD)
-            let indicatorNode = LayoutNode()
-            indicatorNode.fixedWidth = 200
-            indicatorNode.fixedHeight = 8
-            indicatorNode.cornerRadius = 4
-            indicatorNode.backgroundColor = theme.surfaceLight
-            indicatorNode.stackAxis = .zStack
-
-            let pulseNode = LayoutNode()
-            pulseNode.fixedWidth = 60
-            pulseNode.fixedHeight = 8
-            pulseNode.cornerRadius = 4
-            pulseNode.backgroundColor = theme.primary
-
-            indicatorNode.children = [pulseNode]
-            node.children.append(indicatorNode)
-        }
-
+        node.children = [navBar, dividerNode, contentNode]
         return node
     }
 
-    // MARK: - FlowStack
+    // MARK: - Divider
 
-    private static func resolveFlowStack(_ flowStack: FlowStack, path: String) -> LayoutNode {
+    private static func resolveDivider() -> LayoutNode {
         let node = LayoutNode()
-        node.stackAxis = .horizontal
-        node.flexWrap = true
-        node.spacing = flowStack.spacing
-        node.lineSpacing = flowStack.lineSpacing
-        node.children = flowStack.resolvedChildren(path: path)
+        node.isDivider = true
+        node.fixedHeight = 1
+        node.backgroundColor = Theme.current.colors.divider
         return node
     }
 
