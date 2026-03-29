@@ -79,6 +79,43 @@ public class LayoutNode {
     public var scrollAxis: ScrollAxis? = nil
     public var scrollStateVar: StateVar<Float>? = nil
 
+    /// Toggle properties
+    public var isToggle: Bool = false
+    public var toggleBinding: Binding<Bool>? = nil
+
+    /// Slider properties
+    public var isSlider: Bool = false
+    public var sliderBinding: Binding<Float>? = nil
+    public var sliderRange: ClosedRange<Float> = 0...1
+    public var sliderStep: Float? = nil
+
+    /// Picker properties
+    public var isPicker: Bool = false
+    public var pickerBinding: Binding<Int>? = nil
+    public var pickerOptions: [String] = []
+    public var pickerSegmentIndex: Int = -1
+    public var pickerStyle: PickerStyle = .segmented
+    public var isPickerExpanded: Bool = false
+
+    /// ProgressView properties
+    public var isProgressView: Bool = false
+    public var progressValue: Float? = nil
+    public var progressTotal: Float = 1.0
+
+    /// Sheet / Modal overlay
+    public var hasSheet: Bool = false
+    public var sheetIsPresented: Binding<Bool>?
+
+    /// TabView properties
+    public var tabSelection: Binding<Int>?
+    public var tabLabels: [String] = []
+
+    /// NavigationView properties
+    public var navigationTitle: String?
+
+    /// Divider
+    public var isDivider: Bool = false
+
     /// Accessibility properties
     public var accessibilityRole: AccessibilityRole = .none
     public var accessibilityLabel: String? = nil
@@ -142,6 +179,8 @@ public class LayoutNode {
             }
             return padding.top + padding.bottom
         }
+    }
+
     // MARK: - Animation Support
 
     private func animate(_ property: AnimatableProperty, from start: Float, to target: Float) {

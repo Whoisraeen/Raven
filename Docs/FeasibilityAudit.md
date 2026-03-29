@@ -39,6 +39,7 @@
 3. **Refactor window creation**
    - Abstract SDL window creation behind a `WindowManager` protocol.
    - Implement a minimal multi‑window manager that can spawn additional SDL windows and expose their IDs to Swift.
+   - ✅ *Platform layer (clipboard, file dialogs, notifications) completed 2026-03-28 via Rust FFI. Window abstraction remains.*
 
 ### Phase 2 – Media & Rich UI (2‑4 months)
 1. **Video decoding pipeline**

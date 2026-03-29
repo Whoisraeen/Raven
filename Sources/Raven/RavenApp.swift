@@ -1,5 +1,6 @@
 import CSDL3
 import CVulkan
+import Foundation
 
 
 // MARK: - RavenApp
@@ -82,6 +83,42 @@ public class RavenApp<Content: View>: @unchecked Sendable {
 
         var lastTicks = SDL_GetTicks()
 
+        // Initialize hot reload (debug builds by default, or RAVEN_HOT_RELOAD=1)
+        let hotReloadEnabled: Bool = {
+            #if DEBUG
+            let envDisable = ProcessInfo.processInfo.environment["RAVEN_HOT_RELOAD"]
+            return envDisable != "0"  // Enabled unless explicitly disabled
+            #else
+            return ProcessInfo.processInfo.environment["RAVEN_HOT_RELOAD"] == "1"
+            #endif
+        }()
+
+        if hotReloadEnabled {
+            HotReloadEngine.shared.onReloadNeeded = {
+                // Snapshot state before rebuild
+                StateSnapshotManager.shared.takeSnapshot()
+                // Trigger rebuild on next frame
+                StateTracker.shared.markDirty()
+            }
+
+            HotReloadEngine.shared.onStatusChange = { status in
+                switch status {
+                case .started(let paths, let fileCount):
+                    RavenLogger.info("🔥 Hot Reload active — \(fileCount) files in \(paths.count) path(s)")
+                case .reloading(let changes, let reloadNumber):
+                    RavenLogger.info("🔄 Hot Reload #\(reloadNumber) — \(changes.count) file(s) changed")
+                case .reloaded(let reloadNumber):
+                    RavenLogger.info("✅ Hot Reload #\(reloadNumber) complete")
+                case .stopped(let total):
+                    RavenLogger.info("Hot Reload stopped (total: \(total) reloads)")
+                case .error(let msg):
+                    RavenLogger.error("Hot Reload error: \(msg)")
+                }
+            }
+
+            HotReloadEngine.shared.start()
+        }
+
         while isRunning {
             let currentTicks = SDL_GetTicks()
             let deltaTime = Double(currentTicks - lastTicks) / 1000.0
@@ -139,6 +176,16 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                         }
                     }
 
+                case UInt32(SDL_EVENT_MOUSE_MOTION.rawValue):
+                    // Mouse motion — handle slider drag
+                    let mouseX = Float(event.motion.x)
+                    let mouseY = Float(event.motion.y)
+                    EventDispatcher.handleMouseMotion(x: mouseX, y: mouseY)
+
+                case UInt32(SDL_EVENT_MOUSE_BUTTON_UP.rawValue):
+                    // Mouse button release — end slider drag
+                    EventDispatcher.handleMouseUp()
+
                 default:
                     break
                 }
@@ -195,6 +242,11 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                     renderer.textRenderer.updateAtlasIfNeeded()
 
                     needsRebuild = false
+
+                    // Restore state after hot reload (if a snapshot was taken)
+                    if StateSnapshotManager.shared.hasSnapshot {
+                        StateSnapshotManager.shared.restoreSnapshot()
+                    }
                 }
 
                 // Always present a frame (Vulkan swapchain expects continuous presentation)
@@ -204,7 +256,12 @@ public class RavenApp<Content: View>: @unchecked Sendable {
             }
         }
 
-        print("Raven exited cleanly.")
+        // Cleanup hot reload
+        if hotReloadEnabled {
+            HotReloadEngine.shared.stop()
+        }
+
+        RavenLogger.info("Raven exited cleanly.")
     }
 }
 

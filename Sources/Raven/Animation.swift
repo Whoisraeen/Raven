@@ -62,7 +62,7 @@ public class AnimationEngine: @unchecked Sendable {
         
         // Signal that a re-render is needed if any animation updated
         if !activeAnimations.isEmpty {
-            StateTracker.shared.notifyChange()
+            StateTracker.shared.markDirty()
         }
     }
     

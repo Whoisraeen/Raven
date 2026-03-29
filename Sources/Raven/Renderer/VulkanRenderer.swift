@@ -47,6 +47,9 @@ final class VulkanRenderer: @unchecked Sendable {
     // Allocation callbacks
     private let allocationCallbacks: UnsafePointer<VkAllocationCallbacks>? = nil
 
+    // Debug messenger (validation layers)
+    private var debugMessenger: VulkanDebugMessenger?
+
     // SDL window reference for resize
     let window: OpaquePointer
 
@@ -72,6 +75,9 @@ final class VulkanRenderer: @unchecked Sendable {
         self.imageAvailableSemaphore = created.imageAvailableSemaphore
         self.renderFinishedSemaphore = created.renderFinishedSemaphore
         self.inFlightFence = created.inFlightFence
+
+        // --- Debug Messenger (Vulkan Validation Layers) ---
+        self.debugMessenger = VulkanDebugMessenger.create(instance: instance)
 
         // --- Graphics Pipeline ---
         self.pipeline = VulkanPipeline(
@@ -143,12 +149,24 @@ final class VulkanRenderer: @unchecked Sendable {
         extensionNames.append(UnsafePointer(portabilityExtName))
         #endif
 
+        // Validation layer support: add debug utils extension if validation is enabled
+        let enableValidation = VulkanDebugMessenger.isEnabled && VulkanDebugMessenger.validationLayersAvailable()
+        var debugExtName: UnsafeMutablePointer<CChar>? = nil
+        if enableValidation {
+            debugExtName = SDL_strdup("VK_EXT_debug_utils")!
+            extensionNames.append(UnsafePointer(debugExtName!))
+        }
+
         var instanceFlags: VkInstanceCreateFlags = 0
         #if os(macOS)
         instanceFlags = vkInstanceCreateEnumeratePortabilityBitKHR
         #endif
 
         let finalExtensionCount = UInt32(extensionNames.count)
+
+        // Validation layer name
+        var validationLayerName = SDL_strdup("VK_LAYER_KHRONOS_validation")!
+        var validationLayerPtr: UnsafePointer<CChar>? = UnsafePointer(validationLayerName)
 
         var instanceHandle: VkInstance?
         extensionNames.withUnsafeBufferPointer { extensionBuffer in
@@ -165,24 +183,30 @@ final class VulkanRenderer: @unchecked Sendable {
                     )
 
                     withUnsafePointer(to: &appInfo) { appInfoPointer in
-                        var instanceCreateInfo = VkInstanceCreateInfo(
-                            sType: VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-                            pNext: nil,
-                            flags: instanceFlags,
-                            pApplicationInfo: appInfoPointer,
-                            enabledLayerCount: 0,
-                            ppEnabledLayerNames: nil,
-                            enabledExtensionCount: finalExtensionCount,
-                            ppEnabledExtensionNames: extensionBuffer.baseAddress
-                        )
-                        vkCheck(
-                            vkCreateInstance(&instanceCreateInfo, nil, &instanceHandle),
-                            "vkCreateInstance"
-                        )
+                        withUnsafePointer(to: &validationLayerPtr) { layerPtrPtr in
+                            var instanceCreateInfo = VkInstanceCreateInfo(
+                                sType: VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+                                pNext: nil,
+                                flags: instanceFlags,
+                                pApplicationInfo: appInfoPointer,
+                                enabledLayerCount: enableValidation ? 1 : 0,
+                                ppEnabledLayerNames: enableValidation ? layerPtrPtr : nil,
+                                enabledExtensionCount: finalExtensionCount,
+                                ppEnabledExtensionNames: extensionBuffer.baseAddress
+                            )
+                            vkCheck(
+                                vkCreateInstance(&instanceCreateInfo, nil, &instanceHandle),
+                                "vkCreateInstance"
+                            )
+                        }
                     }
                 }
             }
         }
+
+        // Clean up allocated strings
+        SDL_free(validationLayerName)
+        if let debugExtName = debugExtName { SDL_free(debugExtName) }
 
         guard let instance = instanceHandle else { fail("vkCreateInstance returned null") }
 
@@ -709,6 +733,10 @@ final class VulkanRenderer: @unchecked Sendable {
         vkDestroySwapchainKHR(device, swapchain, nil)
         vkDestroyDevice(device, nil)
         SDL_Vulkan_DestroySurface(instance, surface, allocationCallbacks)
+
+        // Destroy debug messenger before instance (required order)
+        debugMessenger?.destroy(instance: instance)
+
         vkDestroyInstance(instance, nil)
     }
 }

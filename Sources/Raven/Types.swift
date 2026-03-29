@@ -32,6 +32,20 @@ public struct Color: Sendable {
     public static let surfaceLight = Color(0.20, 0.22, 0.28)
     public static let text = Color(0.92, 0.92, 0.94)
     public static let textSecondary = Color(0.60, 0.62, 0.66)
+    public static let buttonText = Color(1.0, 1.0, 1.0)
+    public static let accent = Color(0.40, 0.72, 0.40)
+    public static let trackBackground = Color(0.22, 0.24, 0.28)
+    public static let thumbColor = Color(0.92, 0.92, 0.94)
+}
+
+// MARK: - Picker Style
+
+/// The visual style for a Picker component.
+public enum PickerStyle: Sendable {
+    /// Inline horizontal segmented control.
+    case segmented
+    /// Dropdown menu that expands on click.
+    case menu
 }
 
 // MARK: - Edge & Alignment

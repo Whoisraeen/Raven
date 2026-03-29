@@ -1,67 +1,115 @@
 import Raven
 import Foundation
 
-// Animation Demo State
+// MARK: - Component Demo State
+
 let count = StateVar(0)
 let isExpanded = StateVar(false)
 
-let app = RavenApp(title: "Raven Animation Demo", width: 960, height: 640) {
+// New component state
+let isDarkMode = StateVar(false)
+let isNotificationsOn = StateVar(true)
+let volume = StateVar<Float>(0.5)
+let brightness = StateVar<Float>(60)
+let selectedTab = StateVar(0)
+let sortIndex = StateVar(0)
+let downloadProgress = StateVar<Float>(0.65)
+
+let app = RavenApp(title: "Raven Component Showcase", width: 960, height: 640) {
     VStack(spacing: 20) {
-        // Title with fixed background
-        Text("Raven Animation Engine")
+        // Title
+        Text("Raven Component Showcase")
             .foreground(.white)
             .padding(16)
             .background(.surface)
             .cornerRadius(12)
 
-        // Animated Pulse Box
-        HStack {
-            if isExpanded.value {
-                Text("SPRING!")
-                    .foreground(.white)
-                    .padding(30)
-                    .background(.primary)
-                    .cornerRadius(15)
-            } else {
-                Text("STATIC")
-                    .foreground(.white)
-                    .padding(15)
-                    .background(.surface)
-                    .cornerRadius(8)
+        // --- Toggle Section ---
+        VStack(spacing: 12) {
+            Text("Toggles")
+                .foreground(.textSecondary)
+
+            Toggle("Dark Mode", isOn: isDarkMode.binding)
+            Toggle("Notifications", isOn: isNotificationsOn.binding)
+
+            Text("Dark Mode: \(isDarkMode.value ? "ON" : "OFF")")
+                .foreground(.textSecondary)
+        }
+        .padding(16)
+        .background(.surface)
+        .cornerRadius(8)
+
+        // --- Slider Section ---
+        VStack(spacing: 12) {
+            Text("Sliders")
+                .foreground(.textSecondary)
+
+            HStack(spacing: 16) {
+                Text("Volume:")
+                    .foreground(.text)
+                Slider(value: volume.binding, in: 0...1)
+                Text(String(format: "%.0f%%", volume.value * 100))
+                    .foreground(.textSecondary)
+            }
+
+            HStack(spacing: 16) {
+                Text("Brightness:")
+                    .foreground(.text)
+                Slider(value: brightness.binding, in: 0...100, step: 10)
+                Text(String(format: "%.0f", brightness.value))
+                    .foreground(.textSecondary)
             }
         }
-        .padding(20)
+        .padding(16)
+        .background(.surface)
+        .cornerRadius(8)
 
-        // Controls
+        // --- Picker Section ---
         VStack(spacing: 12) {
-            Text("Count: \(count.value)")
-                .foreground(.white)
-                .padding(12)
-                .background(.surface)
+            Text("Pickers")
+                .foreground(.textSecondary)
 
-            HStack(spacing: 12) {
-                Button("Animate Counter") {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
-                        count.value += 1
-                    }
-                }
+            // Segmented control (default style)
+            Picker("View", selection: selectedTab.binding, options: ["Day", "Week", "Month"])
 
-                Button("Toggle Layout") {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        isExpanded.value.toggle()
-                    }
+            // Dropdown menu style
+            Picker("Sort By", selection: sortIndex.binding, options: ["Name", "Date", "Size"])
+                .pickerStyle(.menu)
+        }
+        .padding(16)
+        .background(.surface)
+        .cornerRadius(8)
+
+        // --- ProgressView Section ---
+        VStack(spacing: 12) {
+            Text("Progress")
+                .foreground(.textSecondary)
+
+            ProgressView("Downloading...", value: downloadProgress.value)
+            ProgressView("Indeterminate")
+        }
+        .padding(16)
+        .background(.surface)
+        .cornerRadius(8)
+
+        // --- Controls ---
+        HStack(spacing: 12) {
+            Button("Animate Counter") {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
+                    count.value += 1
                 }
+            }
+
+            Button("Reset Progress") {
+                downloadProgress.value = 0.0
+            }
+
+            Button("+10% Progress") {
+                downloadProgress.value = min(downloadProgress.value + 0.1, 1.0)
             }
         }
 
         Spacer()
-
-        Button("Reset") {
-            withAnimation(.easeInOut(duration: 0.5)) {
-                count.value = 0
-                isExpanded.value = false
-            }
-        }
     }
     .padding(32)
     .background(Color(0.08, 0.09, 0.12))
