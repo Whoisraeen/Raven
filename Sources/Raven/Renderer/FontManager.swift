@@ -1,5 +1,6 @@
 import CSTBTrueType
 import CVulkan
+import Foundation
 
 // MARK: - FontManager
 
@@ -7,12 +8,6 @@ import CVulkan
 /// Supports loading TTF fonts, generating SDF glyphs on demand,
 /// and maintaining a dynamic texture atlas.
 /// Thread-safe via RavenLock — glyph cache and atlas access are synchronized.
-public enum FontError: Error {
-    case fileNotFound(String)
-    case readFailed(String)
-    case emptyFile(String)
-    case initializationFailed
-}
 
 public class FontManager: @unchecked Sendable {
     /// Singleton instance

@@ -88,4 +88,56 @@ enum RavenCore {
         raven_core_free_string(ptr)
         return str
     }
+
+    // MARK: - Notifications
+
+    @discardableResult
+    static func showNotification(title: String, body: String) -> Bool {
+        title.withCString { tPtr in
+            body.withCString { bPtr in
+                raven_notification_show(tPtr, bPtr) == 0
+            }
+        }
+    }
+
+    // MARK: - System Tray
+
+    nonisolated(unsafe) private static var _trayClickCallback: (@Sendable () -> Void)?
+
+    static func addSystemTray(title: String, iconPath: String, onClick: @escaping @Sendable () -> Void) {
+        _trayClickCallback = onClick
+
+        let cCallback: @convention(c) () -> Void = {
+            RavenCore._trayClickCallback?()
+        }
+
+        title.withCString { tPtr in
+            iconPath.withCString { iPtr in
+                raven_tray_add(tPtr, iPtr, cCallback)
+            }
+        }
+    }
+
+    static func removeSystemTray() {
+        raven_tray_remove()
+        _trayClickCallback = nil
+    }
+
+    // MARK: - Window Management (Native Hacks)
+
+    static func windowMinimize(hwnd: UnsafeMutableRawPointer) {
+        raven_window_minimize(hwnd)
+    }
+
+    static func windowMaximize(hwnd: UnsafeMutableRawPointer) {
+        raven_window_maximize(hwnd)
+    }
+
+    static func windowClose(hwnd: UnsafeMutableRawPointer) {
+        raven_window_close(hwnd)
+    }
+
+    static func windowSetBorderless(hwnd: UnsafeMutableRawPointer, borderless: Bool) {
+        raven_window_set_borderless(hwnd, borderless)
+    }
 }

@@ -229,24 +229,9 @@ public class Profiler: @unchecked Sendable {
 
     // MARK: - High-Resolution Timing
 
-    /// Returns the current time in nanoseconds, using the best available clock.
+    /// Returns the current time in nanoseconds.
     private func currentTimeNanos() -> UInt64 {
-        #if os(macOS) || os(iOS)
-        // Use mach_absolute_time for sub-microsecond precision
-        var timebase = mach_timebase_info_data_t()
-        mach_timebase_info(&timebase)
-        let machTime = mach_absolute_time()
-        return machTime * UInt64(timebase.numer) / UInt64(timebase.denom)
-        #else
-        // Use clock_gettime on Windows/Linux
-        var ts = timespec()
-        #if os(Windows)
-        clock_gettime(CLOCK_REALTIME, &ts)
-        #else
-        clock_gettime(CLOCK_MONOTONIC, &ts)
-        #endif
-        return UInt64(ts.tv_sec) * 1_000_000_000 + UInt64(ts.tv_nsec)
-        #endif
+        return DispatchTime.now().uptimeNanoseconds
     }
 
     // MARK: - Signpost Integration (macOS only)

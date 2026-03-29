@@ -128,6 +128,9 @@ public enum FontError: Error, CustomStringConvertible {
     case invalidFont
     case atlasFull
     case glyphNotFound(UInt32)
+    case readFailed(String)
+    case emptyFile(String)
+    case initializationFailed
 
     public var description: String {
         switch self {
@@ -135,6 +138,9 @@ public enum FontError: Error, CustomStringConvertible {
         case .invalidFont: return "Invalid or corrupt font data"
         case .atlasFull: return "Font atlas is full and cannot grow further"
         case .glyphNotFound(let cp): return "Glyph not found for codepoint: \(cp)"
+        case .readFailed(let msg): return "Failed to read font file: \(msg)"
+        case .emptyFile(let path): return "Font file is empty: \(path)"
+        case .initializationFailed: return "Failed to initialize font system"
         }
     }
 }

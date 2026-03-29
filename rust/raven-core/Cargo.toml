@@ -9,3 +9,12 @@ crate-type = ["staticlib"]
 
 [build-dependencies]
 # No build deps needed — version sync is manual. Use `raven version` to verify.
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.52.0", features = [
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Foundation",
+    "Win32_System_LibraryLoader",
+    "Win32_Graphics_Gdi",
+] }

@@ -2,8 +2,10 @@ mod platform;
 mod clipboard;
 mod file_dialog;
 mod notification;
+mod tray;
+mod window;
 
-use std::ffi::{c_char, CString};
+use std::ffi::{c_char, c_void, CString};
 use std::cell::RefCell;
 
 thread_local! {
@@ -98,6 +100,46 @@ pub extern "C" fn raven_notification_show(title: *const c_char, body: *const c_c
     } else {
         -1
     }
+}
+
+// MARK: - System Tray
+
+pub type RavenTrayCallback = extern "C" fn();
+
+#[no_mangle]
+pub extern "C" fn raven_tray_add(
+    title: *const c_char,
+    icon_path: *const c_char,
+    on_click: Option<RavenTrayCallback>,
+) {
+    tray::add(title, icon_path, on_click);
+}
+
+#[no_mangle]
+pub extern "C" fn raven_tray_remove() {
+    tray::remove();
+}
+
+// MARK: - Window Handling
+
+#[no_mangle]
+pub extern "C" fn raven_window_minimize(hwnd: *mut c_void) {
+    window::minimize(hwnd);
+}
+
+#[no_mangle]
+pub extern "C" fn raven_window_maximize(hwnd: *mut c_void) {
+    window::maximize(hwnd);
+}
+
+#[no_mangle]
+pub extern "C" fn raven_window_close(hwnd: *mut c_void) {
+    window::close(hwnd);
+}
+
+#[no_mangle]
+pub extern "C" fn raven_window_set_borderless(hwnd: *mut c_void, borderless: bool) {
+    window::set_borderless(hwnd, borderless);
 }
 
 // MARK: - Memory Management

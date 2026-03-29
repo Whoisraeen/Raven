@@ -58,6 +58,9 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         }
         defer { SDL_DestroyWindow(window) }
 
+        // Attach to the WindowManager for global native configuration
+        WindowManager.shared.window = window
+
         RavenLogger.info("Window created, initializing Vulkan renderer...")
 
         // Create renderer
@@ -365,6 +368,20 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         for child in node.children {
             collectLifecycleNodes(child, ids: &ids, callbacks: &callbacks)
         }
+    }
+}
+
+// MARK: - API / Ext
+
+extension RavenApp {
+    /// Adds a system tray integration using the Rust Native FFI backend.
+    public static func addSystemTray(icon: String, onClick: @escaping @Sendable () -> Void) {
+        RavenCore.addSystemTray(title: "Raven Application", iconPath: icon, onClick: onClick)
+    }
+
+    /// Removes the current system tray icon manually.
+    public static func removeSystemTray() {
+        RavenCore.removeSystemTray()
     }
 }
 

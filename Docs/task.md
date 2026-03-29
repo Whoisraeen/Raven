@@ -74,11 +74,11 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Problem:** No CI or verification that the project builds for all target architectures (Windows x64/ARM64, macOS Intel/Apple Silicon, macOS 12+, Linux distributions).
   - **Solution:** Set up GitHub Actions matrix builds using `swift build` and `cargo build` for each target. Add scripts to compile the Rust core for each triple, verify linking, and run a minimal smoke test. Fail the CI if any target fails.
 
-- `[ ]` **Windows System Tray Integration (Rust)**
+- `[x]` **Windows System Tray Integration (Rust)**
   - **Problem:** The framework lacks a way to place an icon in the Windows system tray and handle clicks.
-  - **Solution:** Use the `windows` crate to call `Shell_NotifyIconW`. Expose a Swift‑side API (`RavenApp.addSystemTray(icon: String, onClick: () -> Void)`). Implement the Rust side to manage the tray and forward events via FFI.
+  - **Solution:** Use the `windows-sys` crate to call `Shell_NotifyIconW`. Expose a Swift‑side API (`RavenApp.addSystemTray(icon: String, onClick: () -> Void)`). Implement the Rust side to manage the tray and forward events via FFI.
 
-- `[ ]` **Native Windowing & Custom Title Bar per Platform**
+- `[x]` **Native Windowing & Custom Title Bar per Platform**
   - **Problem:** Current window is a plain SDL window with no custom chrome, limiting UI integration.
   - **Solution:** Abstract a `WindowManager` interface in Rust with platform‑specific implementations (Win32, Cocoa, X11/Wayland). Provide APIs to hide the default title bar, draw a custom bar using Raven UI, and expose window controls (minimize, maximize, close). Use `SDL_SetWindowBordered` where possible and fall back to native APIs.
 
