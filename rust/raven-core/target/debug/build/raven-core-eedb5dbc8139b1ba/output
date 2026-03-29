@@ -1,2 +1,0 @@
-cargo:rustc-env=RAVEN_VERSION=0.1.0
-cargo:rerun-if-changed=../../version.json
