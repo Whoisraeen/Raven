@@ -31,6 +31,10 @@ typedef void (*RavenTrayCallback)(void);
 void raven_tray_add(const char* title, const char* icon_path, RavenTrayCallback on_click);
 void raven_tray_remove(void);
 
+/* Accessibility */
+int raven_accessibility_set_tree(const char* json);
+char* raven_accessibility_get_tree(void);
+
 /* Platform API - Window Controls */
 void raven_window_minimize(void* hwnd);
 void raven_window_maximize(void* hwnd);

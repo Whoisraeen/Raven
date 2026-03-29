@@ -460,7 +460,7 @@ public class ImageRenderer {
                 vertexBindingDescriptionCount: 1,
                 pVertexBindingDescriptions: &bindingDesc,
                 vertexAttributeDescriptionCount: UInt32(attrDescs.count),
-                pVertexAttributeDescriptions: &attrDescs[0]
+                pVertexAttributeDescriptions: nil  // Set inside withUnsafeMutableBufferPointer
             )
 
             var inputAssembly = VkPipelineInputAssemblyStateCreateInfo(
@@ -527,34 +527,45 @@ public class ImageRenderer {
                 sType: VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
                 pNext: nil, flags: 0,
                 dynamicStateCount: UInt32(dynamicStates.count),
-                pDynamicStates: &dynamicStates[0]
+                pDynamicStates: nil  // Set inside withUnsafeMutableBufferPointer
             )
 
-            var pipelineInfo = VkGraphicsPipelineCreateInfo(
-                sType: VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-                pNext: nil, flags: 0,
-                stageCount: UInt32(shaderStages.count),
-                pStages: &shaderStages[0],
-                pVertexInputState: &vertexInputInfo,
-                pInputAssemblyState: &inputAssembly,
-                pTessellationState: nil,
-                pViewportState: &viewportState,
-                pRasterizationState: &rasterizer,
-                pMultisampleState: &multisample,
-                pDepthStencilState: nil,
-                pColorBlendState: &colorBlending,
-                pDynamicState: &dynamicState,
-                layout: pipelineLayout,
-                renderPass: renderPass,
-                subpass: 0,
-                basePipelineHandle: nil,
-                basePipelineIndex: -1
-            )
+            // Pin array storage with withUnsafeMutableBufferPointer to avoid dangling pointers
+            let stageCount = UInt32(shaderStages.count)
+            shaderStages.withUnsafeMutableBufferPointer { stagesPtr in
+                attrDescs.withUnsafeMutableBufferPointer { attrPtr in
+                    dynamicStates.withUnsafeMutableBufferPointer { dynPtr in
+                        vertexInputInfo.pVertexAttributeDescriptions = UnsafePointer(attrPtr.baseAddress)
+                        dynamicState.pDynamicStates = UnsafePointer(dynPtr.baseAddress)
 
-            vkCheck(
-                vkCreateGraphicsPipelines(device, nil, 1, &pipelineInfo, nil, &graphicsPipeline),
-                "vkCreateGraphicsPipelines(image)"
-            )
+                        var pipelineInfo = VkGraphicsPipelineCreateInfo(
+                            sType: VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+                            pNext: nil, flags: 0,
+                            stageCount: stageCount,
+                            pStages: stagesPtr.baseAddress,
+                            pVertexInputState: &vertexInputInfo,
+                            pInputAssemblyState: &inputAssembly,
+                            pTessellationState: nil,
+                            pViewportState: &viewportState,
+                            pRasterizationState: &rasterizer,
+                            pMultisampleState: &multisample,
+                            pDepthStencilState: nil,
+                            pColorBlendState: &colorBlending,
+                            pDynamicState: &dynamicState,
+                            layout: pipelineLayout,
+                            renderPass: renderPass,
+                            subpass: 0,
+                            basePipelineHandle: nil,
+                            basePipelineIndex: -1
+                        )
+
+                        vkCheck(
+                            vkCreateGraphicsPipelines(device, nil, 1, &pipelineInfo, nil, &graphicsPipeline),
+                            "vkCreateGraphicsPipelines(image)"
+                        )
+                    }
+                }
+            }
         }
     }
 

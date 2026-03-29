@@ -123,6 +123,25 @@ enum RavenCore {
         _trayClickCallback = nil
     }
 
+    // MARK: - Accessibility
+
+    /// Push a JSON-serialized accessibility tree to the platform's assistive technology API.
+    /// Called after each layout pass with the output of AccessibilityCollector.
+    @discardableResult
+    static func setAccessibilityTree(_ json: String) -> Bool {
+        json.withCString { ptr in
+            raven_accessibility_set_tree(ptr) == 0
+        }
+    }
+
+    /// Get the current accessibility tree as JSON, or nil if not set.
+    static func getAccessibilityTree() -> String? {
+        guard let ptr = raven_accessibility_get_tree() else { return nil }
+        let str = String(cString: ptr)
+        raven_core_free_string(ptr)
+        return str
+    }
+
     // MARK: - Window Management (Native Hacks)
 
     static func windowMinimize(hwnd: UnsafeMutableRawPointer) {

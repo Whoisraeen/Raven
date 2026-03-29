@@ -802,8 +802,75 @@ public class TextRenderer {
             )
             vkUpdateDescriptorSets(device, 1, &writeDescriptor, 0, nil)
 
+        } else if fm.incrementalUploadEnabled && !fm.dirtyRects.isEmpty {
+            // Incremental update — only upload changed sub-regions
+            let dirtyRects = fm.dirtyRects
+            let atlasW = Int(newWidth)
+
+            // Calculate total staging buffer size needed for all dirty rects
+            let totalBytes = dirtyRects.reduce(0) { $0 + $1.width * $1.height }
+            let stagingSize = VkDeviceSize(totalBytes)
+
+            let vkBufferUsageTransferSrc: VkBufferUsageFlags = 0x00000001
+            let vkMemoryPropertyHostVisible: VkMemoryPropertyFlags = 0x00000002
+            let vkMemoryPropertyHostCoherent: VkMemoryPropertyFlags = 0x00000004
+            let staging = VulkanBuffer.create(
+                device: device, physicalDevice: physicalDevice,
+                size: stagingSize, usage: vkBufferUsageTransferSrc,
+                memoryPropertyFlags: vkMemoryPropertyHostVisible | vkMemoryPropertyHostCoherent
+            )
+
+            // Pack dirty rect pixel data into staging buffer contiguously
+            var mapped: UnsafeMutableRawPointer?
+            vkCheck(vkMapMemory(device, staging.memory, 0, stagingSize, 0, &mapped), "vkMapMemory(atlasIncremental)")
+            if let mapped = mapped {
+                var offset = 0
+                for rect in dirtyRects {
+                    let dst = mapped.advanced(by: offset)
+                    for row in 0..<rect.height {
+                        let srcIdx = (rect.y + row) * atlasW + rect.x
+                        atlasData.withUnsafeBufferPointer { srcBuf in
+                            dst.advanced(by: row * rect.width)
+                                .copyMemory(from: srcBuf.baseAddress!.advanced(by: srcIdx),
+                                            byteCount: rect.width)
+                        }
+                    }
+                    offset += rect.width * rect.height
+                }
+                vkUnmapMemory(device, staging.memory)
+            }
+
+            let cmdBuf = beginSingleTimeCommands()
+            transitionImageLayout(cmdBuf: cmdBuf, image: atlasImage!,
+                                  oldLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                  newLayout: VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+
+            // Issue one vkCmdCopyBufferToImage per dirty rect with offset/extent
+            var bufferOffset: VkDeviceSize = 0
+            for rect in dirtyRects {
+                var region = VkBufferImageCopy(
+                    bufferOffset: bufferOffset,
+                    bufferRowLength: UInt32(rect.width),
+                    bufferImageHeight: UInt32(rect.height),
+                    imageSubresource: VkImageSubresourceLayers(
+                        aspectMask: vkImageAspectColorBit,
+                        mipLevel: 0, baseArrayLayer: 0, layerCount: 1
+                    ),
+                    imageOffset: VkOffset3D(x: Int32(rect.x), y: Int32(rect.y), z: 0),
+                    imageExtent: VkExtent3D(width: UInt32(rect.width), height: UInt32(rect.height), depth: 1)
+                )
+                vkCmdCopyBufferToImage(cmdBuf, staging.buffer, atlasImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region)
+                bufferOffset += VkDeviceSize(rect.width * rect.height)
+            }
+
+            transitionImageLayout(cmdBuf: cmdBuf, image: atlasImage!,
+                                  oldLayout: VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                  newLayout: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+
+            endSingleTimeCommands(cmdBuf)
+            staging.destroy(device: device)
         } else {
-            // Same size — just re-upload data
+            // Full re-upload fallback (incremental disabled or no dirty rects tracked)
             let vkBufferUsageTransferSrc: VkBufferUsageFlags = 0x00000001
             let vkMemoryPropertyHostVisible: VkMemoryPropertyFlags = 0x00000002
             let vkMemoryPropertyHostCoherent: VkMemoryPropertyFlags = 0x00000004

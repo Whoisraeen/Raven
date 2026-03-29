@@ -8,6 +8,30 @@ public struct AccessibilityElement: CustomStringConvertible, Sendable {
     public let frame: (x: Float, y: Float, width: Float, height: Float)
     public let children: [AccessibilityElement]
 
+    /// Serialize this element and its children to a JSON string.
+    public func toJSON() -> String {
+        var parts: [String] = []
+        parts.append("\"role\":\"\(role.rawValue)\"")
+        if let l = label {
+            let escaped = l.replacingOccurrences(of: "\\", with: "\\\\")
+                           .replacingOccurrences(of: "\"", with: "\\\"")
+            parts.append("\"label\":\"\(escaped)\"")
+        } else {
+            parts.append("\"label\":null")
+        }
+        if let v = value {
+            let escaped = v.replacingOccurrences(of: "\\", with: "\\\\")
+                           .replacingOccurrences(of: "\"", with: "\\\"")
+            parts.append("\"value\":\"\(escaped)\"")
+        } else {
+            parts.append("\"value\":null")
+        }
+        parts.append("\"frame\":{\"x\":\(frame.x),\"y\":\(frame.y),\"width\":\(frame.width),\"height\":\(frame.height)}")
+        let childJSON = children.map { $0.toJSON() }.joined(separator: ",")
+        parts.append("\"children\":[\(childJSON)]")
+        return "{\(parts.joined(separator: ","))}"
+    }
+
     public var description: String {
         let attrs = [
             label.map { "label: \"\($0)\"" },

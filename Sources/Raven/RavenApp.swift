@@ -140,13 +140,19 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         }
 
         while isRunning {
+            let profiler = Profiler.shared
+            profiler.begin(.frameTotal)
+
             let currentTicks = SDL_GetTicks()
             let deltaTime = Double(currentTicks - lastTicks) / 1000.0
             lastTicks = currentTicks
 
             // Tick animation engine (interpolates values and notifies state tracker if changed)
+            profiler.begin(.animation)
             AnimationEngine.shared.tick(deltaTime: deltaTime)
+            profiler.end(.animation)
 
+            profiler.begin(.eventHandling)
             while SDL_PollEvent(&event) {
                 switch event.type {
                 case quitEventType:
@@ -229,6 +235,8 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                 }
             }
 
+            profiler.end(.eventHandling)
+
             // Check if any @State/@Published/StateVar changed (or if AnimationEngine triggered a frame)
             if let paths = StateTracker.shared.checkAndClear() {
                 // Snapshot positions from the OLD tree to provide 'start' values for the NEW tree
@@ -246,18 +254,22 @@ public class RavenApp<Content: View>: @unchecked Sendable {
 
                 if needsRebuild {
                     // Re-build view tree (captures current state values)
+                    profiler.begin(.viewResolve)
                     EnvironmentStore.shared.reset()
                     let content = contentBuilder()
                     let resolved = ViewResolver.resolve(content, path: "root")
+                    profiler.end(.viewResolve)
 
                     let viewportWidth = Float(renderer.swapchainExtent.width)
                     let viewportHeight = Float(renderer.swapchainExtent.height)
 
+                    profiler.begin(.layout)
                     LayoutEngine.resolve(
                         root: resolved,
                         viewportWidth: viewportWidth,
                         viewportHeight: viewportHeight
                     )
+                    profiler.end(.layout)
 
                     // Calculate dirty rect (damage region optimization)
                     if !currentDirtyPaths.isEmpty {
@@ -294,14 +306,18 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                     // Process onAppear/onDisappear lifecycle callbacks
                     processLifecycle(root: resolved)
 
-                    // Build accessibility tree (available for screen readers / debugging)
-                    let _ = AccessibilityCollector.collect(root: resolved)
+                    // Build accessibility tree and push to OS assistive technology APIs
+                    if let a11yTree = AccessibilityCollector.collect(root: resolved) {
+                        RavenCore.setAccessibilityTree(a11yTree.toJSON())
+                    }
 
                     // Collect quads, text commands, and image commands
+                    profiler.begin(.renderCollect)
                     let renderOutput = RenderCollector.collect(from: resolved)
                     cachedQuads = renderOutput.quads
                     cachedTextCommands = renderOutput.textCommands
                     cachedImageCommands = renderOutput.imageCommands
+                    profiler.end(.renderCollect)
 
                     // Preload any new image textures
                     for imgCmd in cachedImageCommands {
@@ -320,10 +336,15 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                 }
 
                 // Always present a frame (Vulkan swapchain expects continuous presentation)
+                profiler.begin(.gpuSubmit)
                 renderer.drawFrame(quads: cachedQuads,
                                    textCommands: cachedTextCommands,
                                    imageCommands: cachedImageCommands,
                                    dirtyRect: dirtyRect)
+                profiler.end(.gpuSubmit)
+
+                profiler.end(.frameTotal)
+                profiler.endFrame()
             }
         }
 

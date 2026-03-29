@@ -1,3 +1,4 @@
+mod accessibility;
 mod platform;
 mod clipboard;
 mod file_dialog;
@@ -140,6 +141,22 @@ pub extern "C" fn raven_window_close(hwnd: *mut c_void) {
 #[no_mangle]
 pub extern "C" fn raven_window_set_borderless(hwnd: *mut c_void, borderless: bool) {
     window::set_borderless(hwnd, borderless);
+}
+
+// MARK: - Accessibility
+
+/// Update the accessibility tree with a JSON snapshot.
+/// Pass null to clear the tree. Returns 0 on success, -1 on error.
+#[no_mangle]
+pub extern "C" fn raven_accessibility_set_tree(json: *const c_char) -> i32 {
+    accessibility::set_tree(json)
+}
+
+/// Get the current accessibility tree as JSON.
+/// Returns null if no tree is set. Caller must free with `raven_core_free_string`.
+#[no_mangle]
+pub extern "C" fn raven_accessibility_get_tree() -> *mut c_char {
+    accessibility::get_tree()
 }
 
 // MARK: - Memory Management

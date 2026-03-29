@@ -195,6 +195,12 @@ let package = Package(
             dependencies: ["Raven"],
             swiftSettings: platformSwiftSettings,
             linkerSettings: demoLinkerSettings
+        ),
+        .testTarget(
+            name: "RavenTests",
+            dependencies: ["Raven"],
+            swiftSettings: platformSwiftSettings,
+            linkerSettings: demoLinkerSettings
         )
     ]
 )

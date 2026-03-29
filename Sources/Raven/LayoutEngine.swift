@@ -1,14 +1,20 @@
+import Foundation
+
 // MARK: - LayoutEngine
 
 /// Resolves a LayoutNode tree by assigning positions and sizes.
 /// Uses a two-pass approach:
-/// 1. Measure (bottom-up) — calculate intrinsic sizes (with caching)
+/// 1. Measure (bottom-up) — calculate intrinsic sizes (with caching), parallelized for independent subtrees
 /// 2. Layout (top-down) — assign positions based on parent constraints
 ///
 /// Optimizations:
 /// - Intrinsic size caching: each node caches its measured size and only recalculates when dirty
 /// - Subtree pruning: clean subtrees skip relayout entirely
+/// - Parallel measure: top-level children are measured concurrently when the tree is wide enough
 public enum LayoutEngine {
+
+    /// Minimum number of children to justify parallel measurement overhead.
+    private static let parallelThreshold = 4
 
     /// Resolve the full layout tree within the given viewport.
     /// Supports incremental layout: clean subtrees are skipped when the
@@ -29,10 +35,63 @@ public enum LayoutEngine {
             root.needsLayout = true
         }
 
+        // Pass 1: Parallel measure — pre-compute intrinsic sizes for independent subtrees.
+        // The measure pass is pure (reads node properties, calls FontManager which is thread-safe).
+        // We parallelize at the top level(s) where the tree is widest.
+        parallelMeasure(node: root)
+
+        // Pass 2: Layout — assign positions top-down (sequential, position-dependent).
         layoutChildren(of: root)
 
         // Mark the entire tree as clean after layout
         root.markLayoutClean()
+    }
+
+    // MARK: - Parallel Measure Pass
+
+    /// Pre-compute intrinsic sizes for independent subtrees in parallel.
+    /// Each subtree's measure is pure (no side effects beyond caching), so
+    /// sibling subtrees can be measured concurrently.
+    private static func parallelMeasure(node: LayoutNode) {
+        let children = node.children
+        guard !children.isEmpty else { return }
+
+        if children.count >= parallelThreshold {
+            // Measure sibling subtrees concurrently.
+            // Safety: LayoutNode is a reference type owned by the single UI thread.
+            // concurrentPerform is synchronous — all work completes before returning,
+            // and each iteration operates on a disjoint subtree (no shared mutation).
+            nonisolated(unsafe) let unsafeChildren = children
+            DispatchQueue.concurrentPerform(iterations: children.count) { index in
+                prewarmIntrinsicSizes(node: unsafeChildren[index])
+            }
+        } else {
+            for child in children {
+                prewarmIntrinsicSizes(node: child)
+            }
+        }
+    }
+
+    /// Recursively compute and cache intrinsic sizes bottom-up.
+    /// Visits children first (so their cached values are ready), then triggers
+    /// this node's cachedIntrinsicWidth/Height which reads from children.
+    private static func prewarmIntrinsicSizes(node: LayoutNode) {
+        let children = node.children
+
+        if children.count >= parallelThreshold {
+            nonisolated(unsafe) let unsafeChildren = children
+            DispatchQueue.concurrentPerform(iterations: children.count) { index in
+                prewarmIntrinsicSizes(node: unsafeChildren[index])
+            }
+        } else {
+            for child in children {
+                prewarmIntrinsicSizes(node: child)
+            }
+        }
+
+        // Now compute this node's intrinsic size (reads children's cached values)
+        let _ = node.cachedIntrinsicWidth
+        let _ = node.cachedIntrinsicHeight
     }
 
     /// Recursively layout the children of a node.
