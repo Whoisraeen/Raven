@@ -1,4 +1,5 @@
 use std::ffi::{c_char, CString, CStr};
+use crate::clipboard;
 
 // MARK: - Clipboard
 
@@ -6,29 +7,13 @@ use std::ffi::{c_char, CString, CStr};
 /// Caller must free the result with raven_core_free_string.
 #[no_mangle]
 pub extern "C" fn raven_clipboard_get_text() -> *mut c_char {
-    let text = clipboard_get_text_impl();
-    match text {
-        Some(s) => CString::new(s).unwrap_or_default().into_raw(),
-        None => std::ptr::null_mut(),
-    }
+    clipboard::get_text()
 }
 
 /// Set text to the system clipboard. Returns 0 on success.
 #[no_mangle]
 pub extern "C" fn raven_clipboard_set_text(text: *const c_char) -> i32 {
-    if text.is_null() {
-        return -1;
-    }
-    let c_str = unsafe { CStr::from_ptr(text) };
-    let str_slice = match c_str.to_str() {
-        Ok(s) => s,
-        Err(_) => return -1,
-    };
-    if clipboard_set_text_impl(str_slice) {
-        0
-    } else {
-        -1
-    }
+    clipboard::set_text(text)
 }
 
 // MARK: - File Open Dialog
@@ -111,31 +96,6 @@ pub extern "C" fn raven_notification_show(
 // --- Windows ---
 
 #[cfg(target_os = "windows")]
-fn clipboard_get_text_impl() -> Option<String> {
-    use std::process::Command;
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-Command", "Get-Clipboard"])
-        .output()
-        .ok()?;
-    if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        None
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn clipboard_set_text_impl(text: &str) -> bool {
-    use std::process::Command;
-    let cmd = format!("Set-Clipboard -Value '{}'", text.replace('\'', "''"));
-    Command::new("powershell")
-        .args(["-NoProfile", "-Command", &cmd])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
-
-#[cfg(target_os = "windows")]
 fn file_open_dialog_impl(title: &str, filter: &str) -> Option<String> {
     use std::process::Command;
     let script = format!(
@@ -188,35 +148,6 @@ fn notification_show_impl(title: &str, body: &str) -> bool {
 }
 
 // --- macOS ---
-
-#[cfg(target_os = "macos")]
-fn clipboard_get_text_impl() -> Option<String> {
-    use std::process::Command;
-    let output = Command::new("pbpaste").output().ok()?;
-    if output.status.success() {
-        Some(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
-        None
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn clipboard_set_text_impl(text: &str) -> bool {
-    use std::process::Command;
-    use std::io::Write;
-    let mut child = Command::new("pbcopy")
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-        .ok();
-    if let Some(ref mut c) = child {
-        if let Some(ref mut stdin) = c.stdin {
-            let _ = stdin.write_all(text.as_bytes());
-        }
-        c.wait().map(|s| s.success()).unwrap_or(false)
-    } else {
-        false
-    }
-}
 
 #[cfg(target_os = "macos")]
 fn file_open_dialog_impl(title: &str, _filter: &str) -> Option<String> {
@@ -275,45 +206,6 @@ fn notification_show_impl(title: &str, body: &str) -> bool {
 }
 
 // --- Linux ---
-
-#[cfg(target_os = "linux")]
-fn clipboard_get_text_impl() -> Option<String> {
-    use std::process::Command;
-    // Try xclip first, then xsel
-    Command::new("xclip")
-        .args(["-selection", "clipboard", "-o"])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-        .or_else(|| {
-            Command::new("xsel")
-                .args(["--clipboard", "--output"])
-                .output()
-                .ok()
-                .filter(|o| o.status.success())
-                .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-        })
-}
-
-#[cfg(target_os = "linux")]
-fn clipboard_set_text_impl(text: &str) -> bool {
-    use std::process::Command;
-    use std::io::Write;
-    let mut child = Command::new("xclip")
-        .args(["-selection", "clipboard"])
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-        .ok();
-    if let Some(ref mut c) = child {
-        if let Some(ref mut stdin) = c.stdin {
-            let _ = stdin.write_all(text.as_bytes());
-        }
-        c.wait().map(|s| s.success()).unwrap_or(false)
-    } else {
-        false
-    }
-}
 
 #[cfg(target_os = "linux")]
 fn file_open_dialog_impl(title: &str, _filter: &str) -> Option<String> {

@@ -32,6 +32,18 @@ public class FontManager: @unchecked Sendable {
     private var atlasData: [UInt8] = []
     private var atlasDirty = false
 
+    /// Dirty rectangles for incremental atlas texture uploads.
+    /// Each rect represents a region that changed since the last upload.
+    public struct DirtyRect: Sendable {
+        public let x: Int
+        public let y: Int
+        public let width: Int
+        public let height: Int
+    }
+    private var _dirtyRects: [DirtyRect] = []
+    /// Whether to use incremental (sub-region) uploads instead of full atlas uploads.
+    public var incrementalUploadEnabled: Bool = true
+
     // Glyph cache
     private var glyphCache: [GlyphKey: GlyphInfo] = [:]
 
@@ -193,6 +205,9 @@ public class FontManager: @unchecked Sendable {
         }
         atlasDirty = true
 
+        // Track the dirty region for incremental upload
+        _dirtyRects.append(DirtyRect(x: destX, y: destY, width: w, height: h))
+
         // Metrics
         var advanceWidth: Int32 = 0
         var leftSideBearing: Int32 = 0
@@ -339,8 +354,15 @@ public class FontManager: @unchecked Sendable {
     /// Whether the atlas texture needs re-uploading.
     public var isAtlasDirty: Bool { atlasDirty }
 
-    /// Mark the atlas as uploaded.
-    public func markAtlasClean() { atlasDirty = false }
+    /// Accumulated dirty rectangles since the last upload.
+    /// Use these for sub-region `vkCmdCopyBufferToImage` calls.
+    public var dirtyRects: [DirtyRect] { _dirtyRects }
+
+    /// Mark the atlas as uploaded. Clears dirty state and dirty rectangles.
+    public func markAtlasClean() {
+        atlasDirty = false
+        _dirtyRects.removeAll(keepingCapacity: true)
+    }
 
     /// Get the current atlas pixel data.
     public var currentAtlasData: [UInt8] { atlasData }

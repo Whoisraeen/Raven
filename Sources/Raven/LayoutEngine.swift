@@ -11,19 +11,40 @@
 public enum LayoutEngine {
 
     /// Resolve the full layout tree within the given viewport.
+    /// Supports incremental layout: clean subtrees are skipped when the
+    /// viewport dimensions haven't changed, reducing per-frame work.
     public static func resolve(root: LayoutNode, viewportWidth: Float, viewportHeight: Float) {
+        // Detect viewport size change — forces full relayout
+        let rootWidth = root.fixedWidth ?? viewportWidth
+        let rootHeight = root.fixedHeight ?? viewportHeight
+        let viewportChanged = root.width != rootWidth || root.height != rootHeight
+
         // The root node fills the entire viewport
         root.x = 0
         root.y = 0
-        root.width = root.fixedWidth ?? viewportWidth
-        root.height = root.fixedHeight ?? viewportHeight
+        root.width = rootWidth
+        root.height = rootHeight
+
+        if viewportChanged {
+            root.needsLayout = true
+        }
+
         layoutChildren(of: root)
+
+        // Mark the entire tree as clean after layout
+        root.markLayoutClean()
     }
 
     /// Recursively layout the children of a node.
+    /// Skips subtrees where no node is marked dirty (needsLayout == false).
     private static func layoutChildren(of node: LayoutNode) {
         let children = node.children
         if children.isEmpty { return }
+
+        // If this node doesn't need layout and none of its descendants do either,
+        // skip the entire subtree.
+        let subtreeNeedsLayout = node.needsLayout || children.contains { $0.needsLayout }
+        guard subtreeNeedsLayout else { return }
 
         // Available content area (inside padding)
         var contentX = node.x + node.padding.leading

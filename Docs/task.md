@@ -3,9 +3,10 @@
 
 The following tasks capture identified problem areas in the Raven framework, each with a detailed description of the issue and a concrete solution proposal. Use this `task.md` as a living checklist during development.
 
-- `[ ]` **Atlas Packing Optimization**
+- `[x]` **Atlas Packing Optimization**
   - **Problem:** The current texture atlas grows exponentially and uses a naïve packing algorithm (`packGlyph`). This can lead to wasted space and frequent atlas reallocations, especially when many glyphs of varying sizes are requested.
   - **Solution:** Replace the simple row‑based packing with a Skyline or MaxRects bin‑packing algorithm. Implement incremental growth (e.g., add rows/columns only as needed) and expose a method to compact the atlas when it becomes fragmented. Update `FontManager.growAtlas()` to preserve existing UVs correctly.
+  - **Completed:** 2026-03-28. Implemented `SkylinePacker` in `FontManager.swift` with efficient bin‑packing. Atlas growth preserves existing UVs. Packer tracks skyline segments for optimal space utilization.
 
 - `[x]` **String Measurement Caching**
   - **Problem:** `FontManager.measureText` iterates over every character on each layout pass, even for static strings that never change, causing unnecessary CPU work.
@@ -92,7 +93,7 @@ The following tasks capture identified problem areas in the Raven framework, eac
 
 *Use this `task.md` as the source of truth for the upcoming sprint. Mark items as `[/]` when work begins and `[x]` when completed.*
 
-- `[ ]` **BUG-001: Insecure `getenv` Usage**
+- `[x]` **BUG-001: Insecure `getenv` Usage**
   - **Severity:** High
   - **Type:** Security Vulnerability
   - **Description:** The codebase uses `getenv` to read environment variables, which is not thread-safe and is deprecated on Windows. This can lead to race conditions and unpredictable behavior.
@@ -102,8 +103,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The application compiles with warnings about deprecated `getenv` usage.
   - **Expected Behavior:** The application should use thread-safe and modern APIs to access environment variables.
   - **Proposed Solution:** Replace `getenv` with `ProcessInfo.processInfo.environment` in Swift. This is a thread-safe way to access environment variables.
+  - **Completed:** 2026-03-28. Replaced all `getenv` calls with `ProcessInfo.processInfo.environment` in `VulkanHelpers.swift` and `VulkanPipeline.swift`.
 
-- `[ ]` **BUG-002: Unhandled Errors in File Operations**
+- `[x]` **BUG-002: Unhandled Errors in File Operations**
   - **Severity:** Medium
   - **Type:** Logical Error
   - **Description:** The `readFileBytes` function in `FontManager.swift` returns `nil` on failure but does not provide any specific error information, making it difficult to debug file-related issues.
@@ -111,8 +113,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The application prints a generic error message to the console when a font file cannot be read.
   - **Expected Behavior:** The function should throw a specific error (e.g., `FontError.fileNotFound`) that can be caught and handled by the caller.
   - **Proposed Solution:** Modify `readFileBytes` to throw a `FontError` on failure, and update the call sites in `FontManager.swift` to handle these errors gracefully.
+  - **Completed:** 2026-03-28. `readFileBytes` and `loadFont` now throw `FontError.fileNotFound` / `FontError.invalidFont`. Error types defined in `Logger.swift`.
 
-- `[ ]` **BUG-003: Naive Atlas Packing Algorithm**
+- `[x]` **BUG-003: Naive Atlas Packing Algorithm**
   - **Severity:** Medium
   - **Type:** Performance Issue
   - **Description:** The `packGlyph` function in `FontManager.swift` uses a simple row-based packing algorithm that can lead to wasted space in the texture atlas, especially when dealing with glyphs of varying sizes.
@@ -120,6 +123,7 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The texture atlas grows larger than necessary, leading to increased memory usage and more frequent reallocations.
   - **Expected Behavior:** The atlas packing algorithm should be more efficient, using techniques like bin packing to minimize wasted space.
   - **Proposed Solution:** Replace the current algorithm with a more advanced one, such as Skyline or MaxRects, to improve atlas packing efficiency.
+  - **Completed:** 2026-03-28. Implemented `SkylinePacker` struct in `FontManager.swift` using the skyline bin‑packing algorithm for efficient glyph placement.
 
 - `[ ]` **BUG-004: Lack of Comprehensive Tests**
   - **Severity:** High
@@ -130,7 +134,7 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Expected Behavior:** The project should have a comprehensive suite of unit, integration, and end-to-end tests.
   - **Proposed Solution:** Create a `Tests` directory with separate test targets for the Swift and Rust codebases. Add tests for critical components like the layout engine, view resolver, and platform APIs.
 
-- `[ ]` **BUG-005: Forced Unwrapping in `RavenApp.swift`**
+- `[x]` **BUG-005: Forced Unwrapping in `RavenApp.swift`**
   - **Severity:** High
   - **Type:** Runtime Exception
   - **Description:** The `RavenApp.swift` file contains several instances of forced unwrapping, which can lead to runtime crashes if the optional values are `nil`.
@@ -138,8 +142,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The application may crash unexpectedly if certain resources (e.g., SDL window, Vulkan instance) cannot be initialized.
   - **Expected Behavior:** The application should handle `nil` values gracefully, either by providing a fallback or by throwing an error.
   - **Proposed Solution:** Replace all forced unwraps with `guard let` or `if let` statements to safely unwrap optionals.
+  - **Completed:** 2026-03-28. All forced unwraps replaced with `guard let` / `if let` with proper error handling via `RavenLogger.error` and `fail()`.
 
-- `[ ]` **BUG-006: Inefficient String Concatenation in `HotReload.swift`**
+- `[x]` **BUG-006: Inefficient String Concatenation in `HotReload.swift`**
   - **Severity:** Low
   - **Type:** Performance Issue
   - **Description:** The `watchLoop` function in `HotReload.swift` uses string concatenation inside a loop to build the log message. This can be inefficient for a large number of changes.
@@ -147,8 +152,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The hot reload process may be slower than necessary when many files are changed at once.
   - **Expected Behavior:** The log message should be constructed more efficiently.
   - **Proposed Solution:** Use string interpolation or a `TextOutputStream` to build the log message more efficiently.
+  - **Completed:** 2026-03-28. Replaced string concatenation with per-change `RavenLogger.info` calls; no loop-based string building remaining.
 
-- `[ ]` **BUG-007: Potential Race Condition in `StateTracker.swift`**
+- `[x]` **BUG-007: Potential Race Condition in `StateTracker.swift`**
   - **Severity:** High
   - **Type:** Logical Error
   - **Description:** The `dirty` flag in `StateTracker.swift` is not always accessed within the lock, which can lead to race conditions in a multi-threaded environment.
@@ -156,8 +162,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The UI may not update correctly if multiple threads modify the state at the same time.
   - **Expected Behavior:** All access to the `dirty` flag should be protected by a lock.
   - **Proposed Solution:** Ensure that all reads and writes to the `dirty` flag are performed within the `lock.withLock` block.
+  - **Completed:** 2026-03-28. All `dirty` flag access (markDirty, markDirty(path:), checkAndClear) is now within `lock.withLock` blocks.
 
-- `[ ]` **BUG-008: Hardcoded Paths in `FontManager.swift`**
+- `[x]` **BUG-008: Hardcoded Paths in `FontManager.swift`**
   - **Severity:** Medium
   - **Type:** Logical Error
   - **Description:** The `loadDefaultFont` function in `FontManager.swift` uses hardcoded relative paths to find the default font, which can break if the application is run from a different directory.
@@ -165,8 +172,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The default font may fail to load if the application's working directory is not what the code expects.
   - **Expected Behavior:** The application should be able to locate the default font regardless of the working directory.
   - **Proposed Solution:** Use a more robust method to locate the bundled resources, such as `Bundle.main.path(forResource:ofType:)`.
+  - **Completed:** 2026-03-28. `loadDefaultFont` now uses `Bundle.module.path(forResource:ofType:)` first, then falls back to relative paths for development.
 
-- `[ ]` **BUG-009: Missing `Sendable` Conformance**
+- `[x]` **BUG-009: Missing `Sendable` Conformance**
   - **Severity:** Medium
   - **Type:** Logical Error
   - **Description:** Several classes, such as `VulkanRenderer` and `HotReloadEngine`, are not marked as `Sendable`, which can cause data races and other concurrency issues with Swift 6's strict concurrency model.
@@ -176,8 +184,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The application may experience data races and other concurrency-related bugs.
   - **Expected Behavior:** All classes that are passed between concurrency domains should conform to `Sendable`.
   - **Proposed Solution:** Add `@unchecked Sendable` conformance to these classes after verifying that they are thread-safe.
+  - **Completed:** 2026-03-28. Added `@unchecked Sendable` conformance to `VulkanRenderer` and `HotReloadEngine`.
 
-- `[ ]` **BUG-010: Rust FFI Linker Errors on Windows**
+- `[x]` **BUG-010: Rust FFI Linker Errors on Windows**
   - **Severity:** High
   - **Type:** Build Error
   - **Description:** The `raven-core` Rust crate fails to build on Windows due to linker errors. The build is missing the necessary Windows libraries for clipboard operations.
@@ -185,8 +194,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The `cargo test` and `cargo build` commands fail with linker errors.
   - **Expected Behavior:** The Rust crate should build successfully on Windows.
   - **Proposed Solution:** Add a build script (`build.rs`) to the `raven-core` crate that links against the necessary Windows libraries (e.g., `user32`).
+  - **Completed:** 2026-03-29. Added `#[cfg(target_os = "windows")] cargo:rustc-link-lib=user32` and `cargo:rustc-link-lib=kernel32` to `build.rs`.
 
-- `[ ]` **BUG-011: Use of `print` for Logging**
+- `[x]` **BUG-011: Use of `print` for Logging**
   - **Severity:** Low
   - **Type:** Functional Deviation
   - **Description:** The codebase uses `print` for logging in several places, which bypasses the structured logging system provided by `RavenLogger`.
@@ -196,8 +206,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** Log messages are not consistently formatted and cannot be filtered by severity.
   - **Expected Behavior:** All log messages should be sent through the `RavenLogger` to ensure consistent formatting and filtering.
   - **Proposed Solution:** Replace all instances of `print` with the appropriate `RavenLogger` method (e.g., `RavenLogger.info`, `RavenLogger.error`).
+  - **Completed:** 2026-03-29. Verified all `print()` calls across the codebase are replaced with `RavenLogger`. The only remaining `print()` is inside `RavenLogger` itself (for Windows output).
 
-- `[ ]` **BUG-012: Inefficient Layout Pass**
+- `[x]` **BUG-012: Inefficient Layout Pass**
   - **Severity:** Medium
   - **Type:** Performance Issue
   - **Description:** The layout engine performs a full layout pass on the entire view hierarchy even when only a small part of the UI has changed.
@@ -205,8 +216,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The application's performance may degrade as the complexity of the UI increases.
   - **Expected Behavior:** The layout engine should only re-compute the layout for the parts of the view hierarchy that have been affected by a state change.
   - **Proposed Solution:** Implement a more granular dependency tracking system that allows the layout engine to identify which nodes need to be re-laid out.
+  - **Completed:** 2026-03-29. Added `needsLayout` dirty flag to `LayoutNode`, `setNeedsLayout()` / `markLayoutClean()` methods, and subtree pruning in `LayoutEngine.layoutChildren()`. Clean subtrees are skipped entirely.
 
-- `[ ]` **BUG-013: Redundant Code in `platform_api.rs`**
+- `[x]` **BUG-013: Redundant Code in `platform_api.rs`**
   - **Severity:** Low
   - **Type:** Logical Error
   - **Description:** The `platform_api.rs` and `clipboard.rs` files contain duplicate code for clipboard operations.
@@ -216,8 +228,9 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The codebase is larger and more difficult to maintain than necessary.
   - **Expected Behavior:** The clipboard-related code should be defined in a single place and reused.
   - **Proposed Solution:** Remove the duplicate clipboard code from `platform_api.rs` and have it call the functions in `clipboard.rs` instead.
+  - **Completed:** 2026-03-29. Removed all `clipboard_get_text_impl` / `clipboard_set_text_impl` functions from `platform_api.rs` (Windows, macOS, Linux). Clipboard functions now delegate to `crate::clipboard` module.
 
-- `[ ]` **BUG-014: Unsafe Pointer Usage in `VulkanRenderer.swift`**
+- `[x]` **BUG-014: Unsafe Pointer Usage in `VulkanRenderer.swift`**
   - **Severity:** High
   - **Type:** Security Vulnerability
   - **Description:** The `VulkanRenderer.swift` file uses `SDL_strdup` to duplicate C strings, but it does not free the allocated memory, leading to memory leaks.
@@ -225,3 +238,4 @@ The following tasks capture identified problem areas in the Raven framework, eac
   - **Observed Behavior:** The application's memory usage will grow over time, which can lead to performance issues and crashes.
   - **Expected Behavior:** All manually allocated memory should be freed when it is no longer needed.
   - **Proposed Solution:** Use a `defer` block to ensure that the memory allocated by `SDL_strdup` is freed with `SDL_free`.
+  - **Completed:** 2026-03-29. Added `SDL_free(portabilityExtName)` in the cleanup block after `vkCreateInstance`. All SDL_strdup allocations now have matching SDL_free calls.

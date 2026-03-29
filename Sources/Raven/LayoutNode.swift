@@ -185,6 +185,24 @@ public class LayoutNode {
     /// Children
     public var children: [LayoutNode] = []
 
+    /// Dirty flag for incremental layout — when false, the engine can skip
+    /// re-laying out this subtree if its position and size haven't changed.
+    public var needsLayout: Bool = true
+
+    /// Mark this node and all descendants as clean after layout.
+    public func markLayoutClean() {
+        needsLayout = false
+        for child in children {
+            child.markLayoutClean()
+        }
+    }
+
+    /// Mark this node (and optionally ancestors) as needing layout.
+    public func setNeedsLayout() {
+        needsLayout = true
+        invalidateIntrinsicSize()
+    }
+
     /// Find a node by its unique path/ID.
     public func findNode(by path: String) -> LayoutNode? {
         if let id = self.id as? String, id == path { return self }

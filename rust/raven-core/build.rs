@@ -2,6 +2,13 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    // Link against Windows system libraries for clipboard and memory APIs
+    #[cfg(target_os = "windows")]
+    {
+        println!("cargo:rustc-link-lib=user32");
+        println!("cargo:rustc-link-lib=kernel32");
+    }
+
     // Read version from the single source of truth: ../../version.json
     let version_path = Path::new("../../version.json");
     if let Ok(contents) = fs::read_to_string(version_path) {

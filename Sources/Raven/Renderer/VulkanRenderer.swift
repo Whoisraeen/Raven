@@ -208,6 +208,9 @@ final class VulkanRenderer: @unchecked Sendable {
         // Clean up allocated strings
         SDL_free(validationLayerName)
         if let debugExtName = debugExtName { SDL_free(debugExtName) }
+        #if os(macOS)
+        SDL_free(portabilityExtName)
+        #endif
 
         guard let instance = instanceHandle else { fail("vkCreateInstance returned null") }
 
