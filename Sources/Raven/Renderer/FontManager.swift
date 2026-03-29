@@ -7,6 +7,13 @@ import CVulkan
 /// Supports loading TTF fonts, generating SDF glyphs on demand,
 /// and maintaining a dynamic texture atlas.
 /// Thread-safe via RavenLock — glyph cache and atlas access are synchronized.
+public enum FontError: Error {
+    case fileNotFound(String)
+    case readFailed(String)
+    case emptyFile(String)
+    case initializationFailed
+}
+
 public class FontManager: @unchecked Sendable {
     /// Singleton instance
     public static let shared = FontManager()
@@ -29,9 +36,7 @@ public class FontManager: @unchecked Sendable {
     private var glyphCache: [GlyphKey: GlyphInfo] = [:]
 
     // Atlas packing cursor
-    private var packCursorX: Int = 0
-    private var packCursorY: Int = 0
-    private var packRowHeight: Int = 0
+    private var skylinePacker: SkylinePacker!
 
     // SDF parameters
     private let sdfPadding: Int32 = 5
@@ -40,17 +45,25 @@ public class FontManager: @unchecked Sendable {
 
     private init() {
         atlasData = [UInt8](repeating: 0, count: atlasWidth * atlasHeight)
+        skylinePacker = SkylinePacker(width: atlasWidth, height: atlasHeight)
     }
 
     // MARK: - Font Loading
 
-    /// Load a TTF font from file path.
-    public func loadFont(path: String) -> Bool {
-        guard let data = readFileBytes(atPath: path) else {
-            print("FontManager: Failed to read font file at \(path)")
-            return false
+    /// Load a TTF font from file path. Throws FontError on failure.
+    public func loadFont(path: String) throws -> Bool {
+        do {
+            let data = try readFileBytes(atPath: path)
+            return loadFont(data: data)
+        } catch FileError.fileNotFound(let p) {
+            throw FontError.fileNotFound(p)
+        } catch FileError.readFailed(let p) {
+            throw FontError.readFailed(p)
+        } catch FileError.emptyFile(let p) {
+            throw FontError.emptyFile(p)
+        } catch {
+            throw FontError.readFailed(path)
         }
-        return loadFont(data: data)
     }
 
     /// Load a TTF font from raw bytes.
@@ -60,22 +73,30 @@ public class FontManager: @unchecked Sendable {
             stbtt_InitFont(&fontInfo, buffer.baseAddress, 0)
         }
         if result == 0 {
-            print("FontManager: stbtt_InitFont failed")
+            RavenLogger.error("FontManager: stbtt_InitFont failed")
             return false
         }
         fontLoaded = true
         glyphCache.removeAll()
-        packCursorX = 0
-        packCursorY = 0
-        packRowHeight = 0
+        skylinePacker.clear()
         atlasData = [UInt8](repeating: 0, count: atlasWidth * atlasHeight)
         atlasDirty = true
-        print("FontManager: Font loaded successfully")
+        RavenLogger.info("FontManager: Font loaded successfully")
         return true
     }
 
     /// Load the bundled default font (Inter).
     public func loadDefaultFont() -> Bool {
+        // Try SPM Bundle.module first
+        if let bundlePath = Bundle.module.path(forResource: "Inter", ofType: "ttf") {
+            do {
+                return try loadFont(path: bundlePath)
+            } catch {
+                RavenLogger.warning("FontManager: Bundle.module font failed - \(error)")
+            }
+        }
+
+        // Fallback for custom binary locations
         let execDir = parentDirectory(of: CommandLine.arguments[0])
         let rendererDir = parentDirectory(of: #filePath)  // Renderer
         let ravenDir = parentDirectory(of: rendererDir)    // Raven
@@ -92,11 +113,15 @@ public class FontManager: @unchecked Sendable {
 
         for path in searchPaths {
             if fileExists(atPath: path) {
-                return loadFont(path: path)
+                do {
+                    return try loadFont(path: path)
+                } catch {
+                    RavenLogger.error("FontManager: Failed to load font at \(path) - \(error)")
+                }
             }
         }
 
-        print("FontManager: Default font not found, using embedded bitmap fallback")
+        RavenLogger.info("FontManager: Default font not found, using embedded bitmap fallback")
         return false
     }
 
@@ -146,18 +171,17 @@ public class FontManager: @unchecked Sendable {
         let w = Int(glyphW)
         let h = Int(glyphH)
 
-        // Pack into atlas
-        if !packGlyph(width: w, height: h) {
+        var packResult = packGlyph(width: w, height: h)
+        if packResult == nil {
             // Atlas is full — grow it
             growAtlas()
-            if !packGlyph(width: w, height: h) {
-                print("FontManager: Atlas still full after growth, glyph too large")
-                return nil
-            }
+            packResult = packGlyph(width: w, height: h)
         }
 
-        let destX = packCursorX - w
-        let destY = packCursorY
+        guard let (destX, destY) = packResult else {
+            RavenLogger.error("FontManager: Atlas still full after growth, glyph too large")
+            return nil
+        }
 
         // Copy SDF data into atlas
         for row in 0..<h {
@@ -330,25 +354,10 @@ public class FontManager: @unchecked Sendable {
 
     // MARK: - Atlas Packing
 
-    private func packGlyph(width: Int, height: Int) -> Bool {
-        guard width > 0 && height > 0 else { return true }
-
-        // Check if glyph fits in current row
-        if packCursorX + width > atlasWidth {
-            // Move to next row
-            packCursorY += packRowHeight + 1
-            packCursorX = 0
-            packRowHeight = 0
-        }
-
-        // Check if glyph fits vertically
-        if packCursorY + height > atlasHeight {
-            return false
-        }
-
-        packCursorX += width + 1
-        packRowHeight = max(packRowHeight, height)
-        return true
+    private func packGlyph(width: Int, height: Int) -> (Int, Int)? {
+        guard width > 0 && height > 0 else { return (0, 0) }
+        // Pack with 1px padding to avoid texture filtering bleed
+        return skylinePacker.pack(w: width + 1, h: height + 1)
     }
 
     private func growAtlas() {
@@ -366,6 +375,7 @@ public class FontManager: @unchecked Sendable {
         atlasWidth = newWidth
         atlasHeight = newHeight
         atlasData = newData
+        skylinePacker.resize(newWidth: newWidth, newHeight: newHeight)
         atlasDirty = true
 
         // Recalculate UV coordinates: atlas doubled, so all UVs halve
@@ -377,7 +387,7 @@ public class FontManager: @unchecked Sendable {
             glyphCache[key] = info
         }
 
-        print("FontManager: Atlas grown to \(newWidth)×\(newHeight)")
+        RavenLogger.info("FontManager: Atlas grown to \(newWidth)×\(newHeight)")
     }
 }
 

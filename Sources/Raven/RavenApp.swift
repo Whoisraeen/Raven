@@ -43,7 +43,7 @@ public class RavenApp<Content: View>: @unchecked Sendable {
 
         // Initialize Rust core
         RavenCore.initialize()
-        print("Raven Core v\(RavenCore.version) on \(RavenCore.platformName) (\(RavenCore.osVersion))")
+        RavenLogger.info("Raven Core v\(RavenCore.version) on \(RavenCore.platformName) (\(RavenCore.osVersion))")
 
         // SDL Init
         guard SDL_Init(SDL_INIT_VIDEO) else {
@@ -58,11 +58,11 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         }
         defer { SDL_DestroyWindow(window) }
 
-        print("[Raven] Window created, initializing Vulkan renderer...")
+        RavenLogger.info("Window created, initializing Vulkan renderer...")
 
         // Create renderer
         let renderer = VulkanRenderer(window: window)
-        print("[Raven] Renderer initialized successfully")
+        RavenLogger.info("Renderer initialized successfully")
         defer { renderer.destroy() }
 
         // Event types
@@ -80,8 +80,8 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         let scancodeHome = SDL_Scancode(rawValue: 74)
         let scancodeEnd = SDL_Scancode(rawValue: 77)
 
-        print("Raven — \(title)")
-        print("Press ESC or close the window to exit.")
+        RavenLogger.info("Raven — \(title)")
+        RavenLogger.info("Press ESC or close the window to exit.")
 
         var event = SDL_Event()
         var isRunning = true
@@ -216,6 +216,10 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                 case UInt32(SDL_EVENT_MOUSE_BUTTON_UP.rawValue):
                     // Mouse button release — end slider drag
                     EventDispatcher.handleMouseUp()
+
+                case UInt32(SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED.rawValue),
+                     UInt32(SDL_EVENT_WINDOW_RESIZED.rawValue):
+                    renderer.recreateSwapchain()
 
                 default:
                     break

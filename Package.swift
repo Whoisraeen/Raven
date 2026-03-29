@@ -185,7 +185,8 @@ let package = Package(
         .target(
             name: "Raven",
             dependencies: ["CSDL3", "CVulkan", "CSTBTrueType", "CSTBImage", "CRavenCore"],
-            exclude: ["Resources", "Shaders"],
+            exclude: ["Shaders"],
+            resources: [.process("Resources")],
             swiftSettings: platformSwiftSettings,
             linkerSettings: ravenLinkerSettings
         ),

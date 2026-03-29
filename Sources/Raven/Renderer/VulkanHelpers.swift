@@ -1,3 +1,4 @@
+import Foundation
 import CSDL3
 import CVulkan
 
@@ -58,9 +59,8 @@ let VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT: VkDebugUtilsMessageTypeFlagsEXT
 /// Whether Vulkan validation layers should be enabled.
 /// Set RAVEN_VULKAN_VALIDATION=1 in the environment to enable.
 let enableVulkanValidation: Bool = {
-    if let val = getenv("RAVEN_VULKAN_VALIDATION") {
-        let str = String(cString: val)
-        return str == "1" || str.lowercased() == "true"
+    if let val = ProcessInfo.processInfo.environment["RAVEN_VULKAN_VALIDATION"] {
+        return val == "1" || val.lowercased() == "true"
     }
     #if DEBUG
     return true
@@ -77,7 +77,7 @@ func currentSDLError() -> String {
 }
 
 func fail(_ message: String) -> Never {
-    print("[FATAL] \(message)")
+    RavenLogger.critical(message)
     exit(1)
 }
 
@@ -119,18 +119,29 @@ func fileExists(atPath path: String) -> Bool {
     _ = SDL_CloseIO(io)
     return true
 }
+public enum FileError: Error {
+    case fileNotFound(String)
+    case emptyFile(String)
+    case readFailed(String)
+}
 
 /// Read all bytes from a file using SDL's file I/O.
-func readFileBytes(atPath path: String) -> [UInt8]? {
-    guard let io = SDL_IOFromFile(path, "rb") else { return nil }
+func readFileBytes(atPath path: String) throws -> [UInt8] {
+    guard let io = SDL_IOFromFile(path, "rb") else {
+        throw FileError.fileNotFound(path)
+    }
     defer { _ = SDL_CloseIO(io) }
 
     let size = SDL_GetIOSize(io)
-    guard size > 0 else { return nil }
+    guard size > 0 else {
+        throw FileError.emptyFile(path)
+    }
 
     var buffer = [UInt8](repeating: 0, count: Int(size))
     let read = SDL_ReadIO(io, &buffer, Int(size))
-    guard read == Int(size) else { return nil }
+    guard read == Int(size) else {
+        throw FileError.readFailed(path)
+    }
     return buffer
 }
 
@@ -270,10 +281,11 @@ func loadSPIRV(named filename: String) -> [UInt8] {
 
     for path in searchPaths {
         if fileExists(atPath: path) {
-            guard let data = readFileBytes(atPath: path) else {
-                fail("Failed to read SPIR-V file at \(path)")
+            do {
+                return try readFileBytes(atPath: path)
+            } catch {
+                fail("Failed to read SPIR-V file at \(path): \(error)")
             }
-            return data
         }
     }
 

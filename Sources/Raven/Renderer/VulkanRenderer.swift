@@ -104,7 +104,7 @@ final class VulkanRenderer: @unchecked Sendable {
             renderPass: pipeline.renderPass
         )
 
-        print("Vulkan renderer initialized successfully.")
+        RavenLogger.info("Vulkan renderer initialized successfully.")
     }
 
     // MARK: - Static Factory (avoids self-capture in init)
@@ -491,6 +491,162 @@ final class VulkanRenderer: @unchecked Sendable {
         )
     }
 
+    // MARK: - Swapchain
+
+    /// Recreates the swapchain and framebuffer attachments after resize or `VK_ERROR_OUT_OF_DATE_KHR`.
+    /// The previous swapchain is passed as `oldSwapchain` to `vkCreateSwapchainKHR` (Vulkan destroys it on success).
+    func recreateSwapchain() {
+        vkCheck(vkDeviceWaitIdle(device), "vkDeviceWaitIdle(recreateSwapchain)")
+        guard let oldSwapchain = swapchain else { return }
+
+        var surfaceCapabilities = VkSurfaceCapabilitiesKHR()
+        vkCheck(
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities),
+            "vkGetPhysicalDeviceSurfaceCapabilitiesKHR(recreate)"
+        )
+
+        var surfaceFormatCount: UInt32 = 0
+        vkCheck(
+            vkGetPhysicalDeviceSurfaceFormatsKHR(
+                physicalDevice, surface, &surfaceFormatCount, nil),
+            "vkGetPhysicalDeviceSurfaceFormatsKHR(count,recreate)"
+        )
+
+        var surfaceFormats = [VkSurfaceFormatKHR](
+            repeating: VkSurfaceFormatKHR(), count: Int(surfaceFormatCount))
+        _ = surfaceFormats.withUnsafeMutableBufferPointer { buffer in
+            vkGetPhysicalDeviceSurfaceFormatsKHR(
+                physicalDevice, surface, &surfaceFormatCount, buffer.baseAddress)
+        }
+
+        let preferredSurfaceFormat =
+            surfaceFormats.first {
+                $0.format == VK_FORMAT_B8G8R8A8_UNORM
+                    && $0.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+            } ?? surfaceFormats[0]
+
+        if preferredSurfaceFormat.format != swapchainFormat {
+            fail("Swapchain surface format changed; full pipeline rebuild is required")
+        }
+
+        var presentModeCount: UInt32 = 0
+        vkCheck(
+            vkGetPhysicalDeviceSurfacePresentModesKHR(
+                physicalDevice, surface, &presentModeCount, nil),
+            "vkGetPhysicalDeviceSurfacePresentModesKHR(count,recreate)"
+        )
+        var presentModes = [VkPresentModeKHR](
+            repeating: VK_PRESENT_MODE_FIFO_KHR, count: Int(presentModeCount))
+        _ = presentModes.withUnsafeMutableBufferPointer { buffer in
+            vkGetPhysicalDeviceSurfacePresentModesKHR(
+                physicalDevice, surface, &presentModeCount, buffer.baseAddress)
+        }
+
+        let presentMode =
+            presentModes.contains(VK_PRESENT_MODE_FIFO_KHR)
+            ? VK_PRESENT_MODE_FIFO_KHR : presentModes[0]
+
+        var swapchainExtent = surfaceCapabilities.currentExtent
+        if swapchainExtent.width == UInt32.max {
+            var w: Int32 = 0
+            var h: Int32 = 0
+            guard SDL_GetWindowSizeInPixels(window, &w, &h) else { return }
+            swapchainExtent = VkExtent2D(width: UInt32(max(w, 1)), height: UInt32(max(h, 1)))
+        }
+
+        swapchainExtent.width = max(
+            min(swapchainExtent.width, surfaceCapabilities.maxImageExtent.width),
+            surfaceCapabilities.minImageExtent.width)
+        swapchainExtent.height = max(
+            min(swapchainExtent.height, surfaceCapabilities.maxImageExtent.height),
+            surfaceCapabilities.minImageExtent.height)
+
+        if swapchainExtent.width == 0 || swapchainExtent.height == 0 {
+            return
+        }
+
+        pipeline.destroyFramebuffers()
+
+        if !commandBuffers.isEmpty {
+            commandBuffers.withUnsafeBufferPointer { buffer in
+                guard let base = buffer.baseAddress else { return }
+                vkFreeCommandBuffers(device, commandPool, UInt32(commandBuffers.count), base)
+            }
+        }
+
+        var desiredImageCount = surfaceCapabilities.minImageCount + 1
+        if surfaceCapabilities.maxImageCount > 0
+            && desiredImageCount > surfaceCapabilities.maxImageCount
+        {
+            desiredImageCount = surfaceCapabilities.maxImageCount
+        }
+
+        let swapchainUsage: VkImageUsageFlags =
+            vkImageUsageColorAttachmentBit | vkImageUsageTransferDstBit
+        var swapchainCreateInfo = VkSwapchainCreateInfoKHR(
+            sType: VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+            pNext: nil,
+            flags: 0,
+            surface: surface,
+            minImageCount: desiredImageCount,
+            imageFormat: preferredSurfaceFormat.format,
+            imageColorSpace: preferredSurfaceFormat.colorSpace,
+            imageExtent: swapchainExtent,
+            imageArrayLayers: 1,
+            imageUsage: swapchainUsage,
+            imageSharingMode: VK_SHARING_MODE_EXCLUSIVE,
+            queueFamilyIndexCount: 0,
+            pQueueFamilyIndices: nil,
+            preTransform: surfaceCapabilities.currentTransform,
+            compositeAlpha: VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+            presentMode: presentMode,
+            clipped: vkTrueValue,
+            oldSwapchain: oldSwapchain
+        )
+
+        var newSwapchainHandle: VkSwapchainKHR?
+        vkCheck(
+            vkCreateSwapchainKHR(device, &swapchainCreateInfo, nil, &newSwapchainHandle),
+            "vkCreateSwapchainKHR(recreate)"
+        )
+        guard let newSwapchain = newSwapchainHandle else {
+            fail("vkCreateSwapchainKHR(recreate) returned null")
+        }
+
+        var swapchainImageCount: UInt32 = 0
+        vkCheck(
+            vkGetSwapchainImagesKHR(device, newSwapchain, &swapchainImageCount, nil),
+            "vkGetSwapchainImagesKHR(count,recreate)"
+        )
+        var newSwapchainImages = [VkImage?](repeating: nil, count: Int(swapchainImageCount))
+        _ = newSwapchainImages.withUnsafeMutableBufferPointer { buffer in
+            vkGetSwapchainImagesKHR(
+                device, newSwapchain, &swapchainImageCount, buffer.baseAddress)
+        }
+
+        swapchain = newSwapchain
+        self.swapchainExtent = swapchainExtent
+        swapchainImages = newSwapchainImages
+
+        pipeline.createFramebuffers(
+            swapchainImages: swapchainImages,
+            swapchainFormat: swapchainFormat,
+            swapchainExtent: swapchainExtent
+        )
+
+        commandBuffers = [VkCommandBuffer?](repeating: nil, count: swapchainImages.count)
+        var commandBufferAllocateInfo = VkCommandBufferAllocateInfo(
+            sType: VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            pNext: nil,
+            commandPool: commandPool,
+            level: VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            commandBufferCount: UInt32(commandBuffers.count)
+        )
+        _ = commandBuffers.withUnsafeMutableBufferPointer { buffer in
+            vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, buffer.baseAddress)
+        }
+    }
+
     // MARK: - Draw Frame
 
     private var pendingQuads: [Quad] = []
@@ -529,94 +685,106 @@ final class VulkanRenderer: @unchecked Sendable {
         vertexBuffer!.upload(device: device, data: allVertices)
         vertexCount = UInt32(allVertices.count)
 
-        // Wait for previous frame
-        var fenceHandle: VkFence? = inFlightFence
-        withUnsafePointer(to: &fenceHandle) { fencePtr in
-            vkCheck(
-                vkWaitForFences(device, 1, fencePtr, vkTrueValue, UInt64.max),
-                "vkWaitForFences"
+        // Fence must be reset only after a successful image acquire; otherwise the fence can stay
+        // unsignaled forever if vkAcquireNextImageKHR returns OUT_OF_DATE after vkResetFences.
+        var acquireAttempts = 0
+        while acquireAttempts < 10 {
+            acquireAttempts += 1
+
+            var fenceHandle: VkFence? = inFlightFence
+            withUnsafePointer(to: &fenceHandle) { fencePtr in
+                vkCheck(
+                    vkWaitForFences(device, 1, fencePtr, vkTrueValue, UInt64.max),
+                    "vkWaitForFences"
+                )
+            }
+
+            guard let swapchainHandle = swapchain else { return }
+
+            var imageIndex: UInt32 = 0
+            let acquireResult = vkAcquireNextImageKHR(
+                device, swapchainHandle, UInt64.max, imageAvailableSemaphore, nil, &imageIndex
             )
-            vkCheck(vkResetFences(device, 1, fencePtr), "vkResetFences")
-        }
+            if acquireResult == VK_ERROR_OUT_OF_DATE_KHR {
+                recreateSwapchain()
+                continue
+            }
+            if acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR {
+                fail("vkAcquireNextImageKHR failed with \(acquireResult.rawValue)")
+            }
 
-        // Acquire next image
-        var imageIndex: UInt32 = 0
-        let acquireResult = vkAcquireNextImageKHR(
-            device, swapchain, UInt64.max, imageAvailableSemaphore, nil, &imageIndex
-        )
-        if acquireResult == VK_ERROR_OUT_OF_DATE_KHR {
-            return
-        }
-        if acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR {
-            fail("vkAcquireNextImageKHR failed with \(acquireResult.rawValue)")
-        }
+            withUnsafePointer(to: &fenceHandle) { fencePtr in
+                vkCheck(vkResetFences(device, 1, fencePtr), "vkResetFences")
+            }
 
-        guard let commandBuffer = commandBuffers[Int(imageIndex)] else {
-            fail("Missing command buffer for index \(imageIndex)")
-        }
+            guard let commandBuffer = commandBuffers[Int(imageIndex)] else {
+                fail("Missing command buffer for index \(imageIndex)")
+            }
 
-        vkCheck(vkResetCommandBuffer(commandBuffer, 0), "vkResetCommandBuffer")
+            vkCheck(vkResetCommandBuffer(commandBuffer, 0), "vkResetCommandBuffer")
 
-        // Record commands
-        recordCommandBuffer(commandBuffer: commandBuffer, imageIndex: imageIndex, dirtyRect: dirtyRect)
+            // Record commands
+            recordCommandBuffer(commandBuffer: commandBuffer, imageIndex: imageIndex, dirtyRect: dirtyRect)
 
-        // Submit
-        var waitSemaphoreHandle: VkSemaphore? = imageAvailableSemaphore
-        var signalSemaphoreHandle: VkSemaphore? = renderFinishedSemaphore
-        var waitStage = vkPipelineStageColorAttachmentOutputBit
-        var commandBufferHandle: VkCommandBuffer? = commandBuffer
+            // Submit
+            var waitSemaphoreHandle: VkSemaphore? = imageAvailableSemaphore
+            var signalSemaphoreHandle: VkSemaphore? = renderFinishedSemaphore
+            var waitStage = vkPipelineStageColorAttachmentOutputBit
+            var commandBufferHandle: VkCommandBuffer? = commandBuffer
 
-        withUnsafePointer(to: &waitSemaphoreHandle) { waitSemPtr in
-            withUnsafePointer(to: &signalSemaphoreHandle) { signalSemPtr in
-                withUnsafePointer(to: &waitStage) { waitStagePtr in
-                    withUnsafePointer(to: &commandBufferHandle) { cmdBufPtr in
-                        var submitInfo = VkSubmitInfo(
-                            sType: VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            withUnsafePointer(to: &waitSemaphoreHandle) { waitSemPtr in
+                withUnsafePointer(to: &signalSemaphoreHandle) { signalSemPtr in
+                    withUnsafePointer(to: &waitStage) { waitStagePtr in
+                        withUnsafePointer(to: &commandBufferHandle) { cmdBufPtr in
+                            var submitInfo = VkSubmitInfo(
+                                sType: VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                                pNext: nil,
+                                waitSemaphoreCount: 1,
+                                pWaitSemaphores: waitSemPtr,
+                                pWaitDstStageMask: waitStagePtr,
+                                commandBufferCount: 1,
+                                pCommandBuffers: cmdBufPtr,
+                                signalSemaphoreCount: 1,
+                                pSignalSemaphores: signalSemPtr
+                            )
+                            vkCheck(
+                                vkQueueSubmit(queue, 1, &submitInfo, inFlightFence),
+                                "vkQueueSubmit"
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Present
+            var presentWaitSemaphore: VkSemaphore? = renderFinishedSemaphore
+            var presentSwapchainHandle: VkSwapchainKHR? = swapchain
+            var presentImageIndex = imageIndex
+
+            withUnsafePointer(to: &presentWaitSemaphore) { waitSemPtr in
+                withUnsafePointer(to: &presentSwapchainHandle) { swapchainPtr in
+                    withUnsafePointer(to: &presentImageIndex) { imageIndexPtr in
+                        var presentInfo = VkPresentInfoKHR(
+                            sType: VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
                             pNext: nil,
                             waitSemaphoreCount: 1,
                             pWaitSemaphores: waitSemPtr,
-                            pWaitDstStageMask: waitStagePtr,
-                            commandBufferCount: 1,
-                            pCommandBuffers: cmdBufPtr,
-                            signalSemaphoreCount: 1,
-                            pSignalSemaphores: signalSemPtr
+                            swapchainCount: 1,
+                            pSwapchains: swapchainPtr,
+                            pImageIndices: imageIndexPtr,
+                            pResults: nil
                         )
-                        vkCheck(
-                            vkQueueSubmit(queue, 1, &submitInfo, inFlightFence),
-                            "vkQueueSubmit"
-                        )
+                        let presentResult = vkQueuePresentKHR(queue, &presentInfo)
+                        if presentResult == VK_ERROR_OUT_OF_DATE_KHR {
+                            recreateSwapchain()
+                        } else if presentResult != VK_SUCCESS && presentResult != VK_SUBOPTIMAL_KHR {
+                            fail("vkQueuePresentKHR failed with \(presentResult.rawValue)")
+                        }
                     }
                 }
             }
-        }
 
-        // Present
-        var presentWaitSemaphore: VkSemaphore? = renderFinishedSemaphore
-        var swapchainHandle: VkSwapchainKHR? = swapchain
-        var presentImageIndex = imageIndex
-
-        withUnsafePointer(to: &presentWaitSemaphore) { waitSemPtr in
-            withUnsafePointer(to: &swapchainHandle) { swapchainPtr in
-                withUnsafePointer(to: &presentImageIndex) { imageIndexPtr in
-                    var presentInfo = VkPresentInfoKHR(
-                        sType: VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-                        pNext: nil,
-                        waitSemaphoreCount: 1,
-                        pWaitSemaphores: waitSemPtr,
-                        swapchainCount: 1,
-                        pSwapchains: swapchainPtr,
-                        pImageIndices: imageIndexPtr,
-                        pResults: nil
-                    )
-                    let presentResult = vkQueuePresentKHR(queue, &presentInfo)
-                    if presentResult != VK_SUCCESS
-                        && presentResult != VK_ERROR_OUT_OF_DATE_KHR
-                        && presentResult != VK_SUBOPTIMAL_KHR
-                    {
-                        fail("vkQueuePresentKHR failed with \(presentResult.rawValue)")
-                    }
-                }
-            }
+            return
         }
     }
 
@@ -784,7 +952,9 @@ final class VulkanRenderer: @unchecked Sendable {
         vkDestroySemaphore(device, renderFinishedSemaphore, nil)
         vkDestroySemaphore(device, imageAvailableSemaphore, nil)
         vkDestroyCommandPool(device, commandPool, nil)
-        vkDestroySwapchainKHR(device, swapchain, nil)
+        if let sc = swapchain {
+            vkDestroySwapchainKHR(device, sc, nil)
+        }
         vkDestroyDevice(device, nil)
         SDL_Vulkan_DestroySurface(instance, surface, allocationCallbacks)
 

@@ -7,7 +7,7 @@ enum RavenCore {
     static func initialize() {
         let result = raven_core_init()
         if result != 0 {
-            print("Warning: raven_core_init returned \(result)")
+            RavenLogger.warning("raven_core_init returned \(result)")
         }
     }
 

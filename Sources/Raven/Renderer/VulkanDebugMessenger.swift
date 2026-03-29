@@ -1,3 +1,4 @@
+import Foundation
 import CVulkan
 #if canImport(WinSDK)
 import WinSDK
@@ -44,7 +45,7 @@ final class VulkanDebugMessenger {
         return true
         #else
         // Allow opt-in in release via environment variable
-        if let env = getEnvironmentVariable("RAVEN_VULKAN_DEBUG") {
+        if let env = ProcessInfo.processInfo.environment["RAVEN_VULKAN_DEBUG"] {
             return env == "1" || env.lowercased() == "true"
         }
         return false
@@ -55,19 +56,19 @@ final class VulkanDebugMessenger {
     /// Returns nil if validation layers are not available or not enabled.
     static func create(instance: VkInstance) -> VulkanDebugMessenger? {
         guard isEnabled else {
-            print("[Raven] Vulkan validation layers: disabled (release build)")
+            RavenLogger.info("Vulkan validation layers: disabled (release build)")
             return nil
         }
 
         guard validationLayersAvailable() else {
-            print("[Raven] Vulkan validation layers: not installed (skipping)")
-            print("[Raven]   Install the Vulkan SDK for validation layer support.")
+            RavenLogger.info("Vulkan validation layers: not installed (skipping)")
+            RavenLogger.info("  Install the Vulkan SDK for validation layer support.")
             return nil
         }
 
         // Load the creation function
         guard let createFuncRaw = vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT") else {
-            print("[Raven] Vulkan validation layers: vkCreateDebugUtilsMessengerEXT not found")
+            RavenLogger.error("Vulkan validation layers: vkCreateDebugUtilsMessengerEXT not found")
             return nil
         }
 
@@ -103,7 +104,7 @@ final class VulkanDebugMessenger {
         let result = createFunc(instance, &createInfo, nil, &messengerHandle)
 
         guard result == VK_SUCCESS, let messenger = messengerHandle else {
-            print("[Raven] Vulkan validation layers: failed to create debug messenger (\(result.rawValue))")
+            RavenLogger.error("Vulkan validation layers: failed to create debug messenger (\(result.rawValue))")
             return nil
         }
 
@@ -111,7 +112,7 @@ final class VulkanDebugMessenger {
         wrapper.messenger = messenger
         wrapper.destroyFunc = destroyFunc
 
-        print("[Raven] Vulkan validation layers: ENABLED ✓")
+        RavenLogger.info("Vulkan validation layers: ENABLED ✓")
         return wrapper
     }
 
@@ -120,7 +121,7 @@ final class VulkanDebugMessenger {
         if let messenger = messenger, let destroyFunc = destroyFunc {
             destroyFunc(instance, messenger, nil)
             self.messenger = nil
-            print("[Raven] Vulkan debug messenger destroyed.")
+            RavenLogger.info("Vulkan debug messenger destroyed.")
         }
     }
 }
@@ -161,7 +162,7 @@ private func vulkanDebugCallback(
         typeTag = "GENERAL"
     }
 
-    print("\(severityTag) [\(typeTag)] \(message)")
+    RavenLogger.debug("\(severityTag) [\(typeTag)] \(message)")
 
     // Return VK_FALSE to not abort the call that triggered this message
     return 0
@@ -178,20 +179,3 @@ let vkDebugUtilsMessageTypeGeneralBitEXT: VkDebugUtilsMessageTypeFlagsEXT = 0x00
 let vkDebugUtilsMessageTypeValidationBitEXT: VkDebugUtilsMessageTypeFlagsEXT = 0x00000002
 let vkDebugUtilsMessageTypePerformanceBitEXT: VkDebugUtilsMessageTypeFlagsEXT = 0x00000004
 
-// MARK: - Environment Variable Helper (Foundation-free)
-
-/// Read an environment variable without importing Foundation.
-func getEnvironmentVariable(_ name: String) -> String? {
-    #if os(Windows)
-    return name.withCString(encodedAs: UTF16.self) { namePtr in
-        let bufferSize = GetEnvironmentVariableW(namePtr, nil, 0)
-        guard bufferSize > 0 else { return nil }
-        var buffer = [UInt16](repeating: 0, count: Int(bufferSize))
-        GetEnvironmentVariableW(namePtr, &buffer, bufferSize)
-        return String(decodingCString: buffer, as: UTF16.self)
-    }
-    #else
-    guard let value = getenv(name) else { return nil }
-    return String(cString: value)
-    #endif
-}

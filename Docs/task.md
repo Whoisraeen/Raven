@@ -1,3 +1,4 @@
+
 # Improvement Tasks for Raven Framework
 
 The following tasks capture identified problem areas in the Raven framework, each with a detailed description of the issue and a concrete solution proposal. Use this `task.md` as a living checklist during development.
@@ -90,3 +91,137 @@ The following tasks capture identified problem areas in the Raven framework, eac
 ---
 
 *Use this `task.md` as the source of truth for the upcoming sprint. Mark items as `[/]` when work begins and `[x]` when completed.*
+
+- `[ ]` **BUG-001: Insecure `getenv` Usage**
+  - **Severity:** High
+  - **Type:** Security Vulnerability
+  - **Description:** The codebase uses `getenv` to read environment variables, which is not thread-safe and is deprecated on Windows. This can lead to race conditions and unpredictable behavior.
+  - **Location:** 
+    - `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\Renderer\VulkanHelpers.swift:61`
+    - `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\Renderer\VulkanPipeline.swift:29`
+  - **Observed Behavior:** The application compiles with warnings about deprecated `getenv` usage.
+  - **Expected Behavior:** The application should use thread-safe and modern APIs to access environment variables.
+  - **Proposed Solution:** Replace `getenv` with `ProcessInfo.processInfo.environment` in Swift. This is a thread-safe way to access environment variables.
+
+- `[ ]` **BUG-002: Unhandled Errors in File Operations**
+  - **Severity:** Medium
+  - **Type:** Logical Error
+  - **Description:** The `readFileBytes` function in `FontManager.swift` returns `nil` on failure but does not provide any specific error information, making it difficult to debug file-related issues.
+  - **Location:** `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\Renderer\FontManager.swift:50`
+  - **Observed Behavior:** The application prints a generic error message to the console when a font file cannot be read.
+  - **Expected Behavior:** The function should throw a specific error (e.g., `FontError.fileNotFound`) that can be caught and handled by the caller.
+  - **Proposed Solution:** Modify `readFileBytes` to throw a `FontError` on failure, and update the call sites in `FontManager.swift` to handle these errors gracefully.
+
+- `[ ]` **BUG-003: Naive Atlas Packing Algorithm**
+  - **Severity:** Medium
+  - **Type:** Performance Issue
+  - **Description:** The `packGlyph` function in `FontManager.swift` uses a simple row-based packing algorithm that can lead to wasted space in the texture atlas, especially when dealing with glyphs of varying sizes.
+  - **Location:** `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\Renderer\FontManager.swift:401`
+  - **Observed Behavior:** The texture atlas grows larger than necessary, leading to increased memory usage and more frequent reallocations.
+  - **Expected Behavior:** The atlas packing algorithm should be more efficient, using techniques like bin packing to minimize wasted space.
+  - **Proposed Solution:** Replace the current algorithm with a more advanced one, such as Skyline or MaxRects, to improve atlas packing efficiency.
+
+- `[ ]` **BUG-004: Lack of Comprehensive Tests**
+  - **Severity:** High
+  - **Type:** Functional Deviation
+  - **Description:** The project lacks a dedicated test suite, making it difficult to verify the correctness of new features and preventing regressions.
+  - **Location:** N/A
+  - **Observed Behavior:** No tests are run when `swift test` or `cargo test` is executed.
+  - **Expected Behavior:** The project should have a comprehensive suite of unit, integration, and end-to-end tests.
+  - **Proposed Solution:** Create a `Tests` directory with separate test targets for the Swift and Rust codebases. Add tests for critical components like the layout engine, view resolver, and platform APIs.
+
+- `[ ]` **BUG-005: Forced Unwrapping in `RavenApp.swift`**
+  - **Severity:** High
+  - **Type:** Runtime Exception
+  - **Description:** The `RavenApp.swift` file contains several instances of forced unwrapping, which can lead to runtime crashes if the optional values are `nil`.
+  - **Location:** `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\RavenApp.swift`
+  - **Observed Behavior:** The application may crash unexpectedly if certain resources (e.g., SDL window, Vulkan instance) cannot be initialized.
+  - **Expected Behavior:** The application should handle `nil` values gracefully, either by providing a fallback or by throwing an error.
+  - **Proposed Solution:** Replace all forced unwraps with `guard let` or `if let` statements to safely unwrap optionals.
+
+- `[ ]` **BUG-006: Inefficient String Concatenation in `HotReload.swift`**
+  - **Severity:** Low
+  - **Type:** Performance Issue
+  - **Description:** The `watchLoop` function in `HotReload.swift` uses string concatenation inside a loop to build the log message. This can be inefficient for a large number of changes.
+  - **Location:** `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\HotReload.swift:186`
+  - **Observed Behavior:** The hot reload process may be slower than necessary when many files are changed at once.
+  - **Expected Behavior:** The log message should be constructed more efficiently.
+  - **Proposed Solution:** Use string interpolation or a `TextOutputStream` to build the log message more efficiently.
+
+- `[ ]` **BUG-007: Potential Race Condition in `StateTracker.swift`**
+  - **Severity:** High
+  - **Type:** Logical Error
+  - **Description:** The `dirty` flag in `StateTracker.swift` is not always accessed within the lock, which can lead to race conditions in a multi-threaded environment.
+  - **Location:** `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\State.swift:207`
+  - **Observed Behavior:** The UI may not update correctly if multiple threads modify the state at the same time.
+  - **Expected Behavior:** All access to the `dirty` flag should be protected by a lock.
+  - **Proposed Solution:** Ensure that all reads and writes to the `dirty` flag are performed within the `lock.withLock` block.
+
+- `[ ]` **BUG-008: Hardcoded Paths in `FontManager.swift`**
+  - **Severity:** Medium
+  - **Type:** Logical Error
+  - **Description:** The `loadDefaultFont` function in `FontManager.swift` uses hardcoded relative paths to find the default font, which can break if the application is run from a different directory.
+  - **Location:** `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\Renderer\FontManager.swift:93`
+  - **Observed Behavior:** The default font may fail to load if the application's working directory is not what the code expects.
+  - **Expected Behavior:** The application should be able to locate the default font regardless of the working directory.
+  - **Proposed Solution:** Use a more robust method to locate the bundled resources, such as `Bundle.main.path(forResource:ofType:)`.
+
+- `[ ]` **BUG-009: Missing `Sendable` Conformance**
+  - **Severity:** Medium
+  - **Type:** Logical Error
+  - **Description:** Several classes, such as `VulkanRenderer` and `HotReloadEngine`, are not marked as `Sendable`, which can cause data races and other concurrency issues with Swift 6's strict concurrency model.
+  - **Location:** 
+    - `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\Renderer\VulkanRenderer.swift:6`
+    - `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\HotReload.swift:36`
+  - **Observed Behavior:** The application may experience data races and other concurrency-related bugs.
+  - **Expected Behavior:** All classes that are passed between concurrency domains should conform to `Sendable`.
+  - **Proposed Solution:** Add `@unchecked Sendable` conformance to these classes after verifying that they are thread-safe.
+
+- `[ ]` **BUG-010: Rust FFI Linker Errors on Windows**
+  - **Severity:** High
+  - **Type:** Build Error
+  - **Description:** The `raven-core` Rust crate fails to build on Windows due to linker errors. The build is missing the necessary Windows libraries for clipboard operations.
+  - **Location:** `c:\Users\woisr\OneDrive\Desktop\Raven\rust\raven-core\src\clipboard.rs`
+  - **Observed Behavior:** The `cargo test` and `cargo build` commands fail with linker errors.
+  - **Expected Behavior:** The Rust crate should build successfully on Windows.
+  - **Proposed Solution:** Add a build script (`build.rs`) to the `raven-core` crate that links against the necessary Windows libraries (e.g., `user32`).
+
+- `[ ]` **BUG-011: Use of `print` for Logging**
+  - **Severity:** Low
+  - **Type:** Functional Deviation
+  - **Description:** The codebase uses `print` for logging in several places, which bypasses the structured logging system provided by `RavenLogger`.
+  - **Location:** 
+    - `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\RavenApp.swift`
+    - `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\Renderer\FontManager.swift`
+  - **Observed Behavior:** Log messages are not consistently formatted and cannot be filtered by severity.
+  - **Expected Behavior:** All log messages should be sent through the `RavenLogger` to ensure consistent formatting and filtering.
+  - **Proposed Solution:** Replace all instances of `print` with the appropriate `RavenLogger` method (e.g., `RavenLogger.info`, `RavenLogger.error`).
+
+- `[ ]` **BUG-012: Inefficient Layout Pass**
+  - **Severity:** Medium
+  - **Type:** Performance Issue
+  - **Description:** The layout engine performs a full layout pass on the entire view hierarchy even when only a small part of the UI has changed.
+  - **Location:** `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\LayoutEngine.swift`
+  - **Observed Behavior:** The application's performance may degrade as the complexity of the UI increases.
+  - **Expected Behavior:** The layout engine should only re-compute the layout for the parts of the view hierarchy that have been affected by a state change.
+  - **Proposed Solution:** Implement a more granular dependency tracking system that allows the layout engine to identify which nodes need to be re-laid out.
+
+- `[ ]` **BUG-013: Redundant Code in `platform_api.rs`**
+  - **Severity:** Low
+  - **Type:** Logical Error
+  - **Description:** The `platform_api.rs` and `clipboard.rs` files contain duplicate code for clipboard operations.
+  - **Location:** 
+    - `c:\Users\woisr\OneDrive\Desktop\Raven\rust\raven-core\src\platform_api.rs`
+    - `c:\Users\woisr\OneDrive\Desktop\Raven\rust\raven-core\src\clipboard.rs`
+  - **Observed Behavior:** The codebase is larger and more difficult to maintain than necessary.
+  - **Expected Behavior:** The clipboard-related code should be defined in a single place and reused.
+  - **Proposed Solution:** Remove the duplicate clipboard code from `platform_api.rs` and have it call the functions in `clipboard.rs` instead.
+
+- `[ ]` **BUG-014: Unsafe Pointer Usage in `VulkanRenderer.swift`**
+  - **Severity:** High
+  - **Type:** Security Vulnerability
+  - **Description:** The `VulkanRenderer.swift` file uses `SDL_strdup` to duplicate C strings, but it does not free the allocated memory, leading to memory leaks.
+  - **Location:** `c:\Users\woisr\OneDrive\Desktop\Raven\Sources\Raven\Renderer\VulkanRenderer.swift`
+  - **Observed Behavior:** The application's memory usage will grow over time, which can lead to performance issues and crashes.
+  - **Expected Behavior:** All manually allocated memory should be freed when it is no longer needed.
+  - **Proposed Solution:** Use a `defer` block to ensure that the memory allocated by `SDL_strdup` is freed with `SDL_free`.

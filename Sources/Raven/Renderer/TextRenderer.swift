@@ -88,13 +88,13 @@ public class TextRenderer {
         // Try to load the default TTF font via FontManager
         useDynamicFont = FontManager.shared.loadDefaultFont()
 
-        print("[TextRenderer] Creating font atlas...")
+        RavenLogger.debug("TextRenderer: Creating font atlas...")
         createFontAtlasTexture()
-        print("[TextRenderer] Creating descriptor resources...")
+        RavenLogger.debug("TextRenderer: Creating descriptor resources...")
         createDescriptorResources()
-        print("[TextRenderer] Creating text pipeline...")
+        RavenLogger.debug("TextRenderer: Creating text pipeline...")
         createTextPipeline(renderPass: renderPass)
-        print("[TextRenderer] Init complete")
+        RavenLogger.debug("TextRenderer: Init complete")
     }
 
     // MARK: - Font Atlas Texture Creation
@@ -325,7 +325,7 @@ public class TextRenderer {
     // MARK: - Text Pipeline
 
     private func createTextPipeline(renderPass: VkRenderPass) {
-        print("[TextPipeline] Creating layout...")
+        RavenLogger.debug("TextPipeline: Creating layout...")
         // Push constant range (viewport size, same as quad pipeline)
         var pushConstantRange = VkPushConstantRange(
             stageFlags: vkShaderStageVertexBit,
@@ -345,15 +345,15 @@ public class TextRenderer {
         vkCheck(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nil, &pipelineLayout),
                 "vkCreatePipelineLayout(text)")
 
-        print("[TextPipeline] Layout created, loading shaders...")
+        RavenLogger.debug("TextPipeline: Layout created, loading shaders...")
         // Load shaders
         let vertCode = loadSPIRV(named: "text_vert.spv")
         let fragCode = loadSPIRV(named: "text_frag.spv")
-        print("[TextPipeline] Shaders loaded (\(vertCode.count)/\(fragCode.count) bytes)")
+        RavenLogger.debug("TextPipeline: Shaders loaded (\(vertCode.count)/\(fragCode.count) bytes)")
 
         let vertModule = createShaderModule(device: device, code: vertCode)
         let fragModule = createShaderModule(device: device, code: fragCode)
-        print("[TextPipeline] Shader modules created")
+        RavenLogger.debug("TextPipeline: Shader modules created")
         defer {
             vkDestroyShaderModule(device, vertModule, nil)
             vkDestroyShaderModule(device, fragModule, nil)
@@ -484,7 +484,7 @@ public class TextRenderer {
             pDynamicStates: nil  // Set inside withUnsafeMutableBufferPointer
         )
 
-        print("[TextPipeline] Creating graphics pipeline...")
+        RavenLogger.debug("TextPipeline: Creating graphics pipeline...")
         shaderStages.withUnsafeMutableBufferPointer { stagesPtr in
             attrDescs.withUnsafeMutableBufferPointer { attrPtr in
                 dynamicStates.withUnsafeMutableBufferPointer { dynPtr in
@@ -519,7 +519,7 @@ public class TextRenderer {
                 }
             }
         }
-        print("[TextPipeline] Graphics pipeline created!")
+        RavenLogger.debug("TextPipeline: Graphics pipeline created!")
 
         // Free the SDL_strdup'd entry point name
         SDL_free(entryPoint)

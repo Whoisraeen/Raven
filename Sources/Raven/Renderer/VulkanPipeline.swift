@@ -1,4 +1,5 @@
 import CVulkan
+import Foundation
 
 #if canImport(Glibc)
 import Glibc
@@ -25,19 +26,20 @@ final class VulkanPipeline {
 
     /// Path for persisting the pipeline cache to disk.
     static let cacheFilePath: String = {
+        let env = ProcessInfo.processInfo.environment
         #if os(Windows)
-        if let appData = getenv("LOCALAPPDATA") {
-            return String(cString: appData) + "\\Raven\\pipeline_cache.bin"
+        if let appData = env["LOCALAPPDATA"] {
+            return appData + "\\Raven\\pipeline_cache.bin"
         }
         return ".raven_pipeline_cache.bin"
         #elseif os(macOS)
-        if let home = getenv("HOME") {
-            return String(cString: home) + "/Library/Caches/Raven/pipeline_cache.bin"
+        if let home = env["HOME"] {
+            return home + "/Library/Caches/Raven/pipeline_cache.bin"
         }
         return ".raven_pipeline_cache.bin"
         #else
-        if let home = getenv("HOME") {
-            return String(cString: home) + "/.cache/raven/pipeline_cache.bin"
+        if let home = env["HOME"] {
+            return home + "/.cache/raven/pipeline_cache.bin"
         }
         return ".raven_pipeline_cache.bin"
         #endif
@@ -392,7 +394,7 @@ final class VulkanPipeline {
             swapchainExtent: swapchainExtent
         )
 
-        print("Vulkan graphics pipeline created successfully.")
+        RavenLogger.info("Vulkan graphics pipeline created successfully.")
     }
 
     func createFramebuffers(

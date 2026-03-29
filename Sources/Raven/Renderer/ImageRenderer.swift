@@ -86,7 +86,7 @@ public class ImageRenderer {
         // Load with stb_image
         var w: Int32 = 0, h: Int32 = 0, channels: Int32 = 0
         guard let pixels = stbi_load(path, &w, &h, &channels, 4) else {
-            print("ImageRenderer: Failed to load \(path)")
+            RavenLogger.error("ImageRenderer: Failed to load \(path)")
             return nil
         }
         defer { stbi_image_free(pixels) }
@@ -240,7 +240,7 @@ public class ImageRenderer {
             width: width, height: height
         )
 
-        print("ImageRenderer: Loaded \(path) (\(width)×\(height))")
+        RavenLogger.info("ImageRenderer: Loaded \(path) (\(width)×\(height))")
         return (width, height)
     }
 

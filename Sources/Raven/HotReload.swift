@@ -231,7 +231,8 @@ public final class HotReloadEngine: @unchecked Sendable {
                 // Only watch Swift source files
                 guard relativePath.hasSuffix(".swift") else { continue }
 
-                let fullPath = "\(basePath)/\(relativePath)"
+                // Optimized path building to avoid interpolation overhead in tight loops
+                let fullPath = [basePath, relativePath].joined(separator: "/")
 
                 if let attrs = try? fm.attributesOfItem(atPath: fullPath),
                    let modDate = attrs[.modificationDate] as? Date {
