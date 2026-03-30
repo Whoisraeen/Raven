@@ -93,7 +93,7 @@ final class VulkanRenderer: @unchecked Sendable {
             queue: queue,
             commandPool: commandPool,
             renderPass: pipeline.renderPass,
-            pipelineCache: pipelineCache
+            pipelineCache: nil
         )
 
         // --- Image Renderer ---
@@ -103,7 +103,7 @@ final class VulkanRenderer: @unchecked Sendable {
             queue: queue,
             commandPool: commandPool,
             renderPass: pipeline.renderPass,
-            pipelineCache: pipelineCache
+            pipelineCache: nil
         )
 
         RavenLogger.info("Vulkan renderer initialized successfully.")

@@ -40,7 +40,7 @@ import Foundation
 /// ```
 public final class HotReloadEngine: @unchecked Sendable {
     /// Singleton instance
-    @MainActor public static let shared = HotReloadEngine()
+    nonisolated(unsafe) public static let shared = HotReloadEngine()
 
     /// Whether hot reload is currently active.
     public private(set) var isActive: Bool = false
@@ -275,7 +275,7 @@ public final class HotReloadEngine: @unchecked Sendable {
 /// 2. After the view tree is rebuilt, matching StateVars are restored from the snapshot.
 /// 3. Unmatched StateVars (new or deleted) are initialized/discarded gracefully.
 public final class StateSnapshotManager: @unchecked Sendable {
-    @MainActor public static let shared = StateSnapshotManager()
+    nonisolated(unsafe) public static let shared = StateSnapshotManager()
 
     /// Registry of named state values. StateVars register themselves on creation.
     private var registry: [String: AnyStateSnapshot] = [:]

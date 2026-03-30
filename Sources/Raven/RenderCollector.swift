@@ -81,7 +81,7 @@ public enum RenderCollector {
             let textWidth = textSize.width
             let textHeight = textSize.height
 
-            let textX = node.x + node.padding.leading + max(0, (availWidth - textWidth) / 2)
+            let textX = node.x + node.padding.leading
             let textY = node.y + node.padding.top + max(0, (node.height - node.padding.top - node.padding.bottom - textHeight) / 2)
 
             output.textCommands.append(TextDrawCommand(

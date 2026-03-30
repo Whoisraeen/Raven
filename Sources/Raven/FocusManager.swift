@@ -6,7 +6,7 @@ import CSDL3
 /// Only one node can have focus at a time.
 /// Thread-safe via RavenLock.
 public class FocusManager: @unchecked Sendable {
-    @MainActor public static let shared = FocusManager()
+    nonisolated(unsafe) public static let shared = FocusManager()
 
     /// The currently focused field's ID (matches LayoutNode identity)
     private(set) var focusedFieldId: String? = nil

@@ -18,7 +18,7 @@ let hoverBg = Color(0.247, 0.255, 0.275)    // #3F4147
 
 let channelNames = ["# general", "# announcements", "# development"]
 
-let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1200, height: 800) {
+let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height: 720) {
     HStack(spacing: 0) {
 
         // --- 1. Server List (Far Left, 72px) ---

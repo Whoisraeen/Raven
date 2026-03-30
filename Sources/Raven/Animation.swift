@@ -41,7 +41,7 @@ public enum AnimatableProperty: Hashable, Sendable {
 /// Manages active animations and interpolates values over time.
 /// Thread-safe via RavenLock for the animation context; tick() must still be called from the main thread.
 public class AnimationEngine: @unchecked Sendable {
-    @MainActor public static let shared = AnimationEngine()
+    nonisolated(unsafe) public static let shared = AnimationEngine()
 
     private var activeAnimations: [AnimationInstance] = []
     private let lock = RavenLock()

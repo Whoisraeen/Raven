@@ -3,7 +3,7 @@ import Foundation
 
 /// Centralized Window Manager for abstracting UI Chrome, Titlebars, and Native Window API hooks.
 public final class WindowManager: @unchecked Sendable {
-    @MainActor public static let shared = WindowManager()
+    nonisolated(unsafe) public static let shared = WindowManager()
 
     // The current main SDL Window handle. Assigned by RavenApp during startup.
     public var window: OpaquePointer?

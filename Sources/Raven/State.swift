@@ -184,7 +184,7 @@ public class StateVar<Value: Sendable>: @unchecked Sendable {
 /// The app loop checks this each frame to decide whether to re-render.
 /// Thread-safe via an unfair lock so background closures can safely mutate state.
 public class StateTracker: @unchecked Sendable {
-    @MainActor public static let shared = StateTracker()
+    nonisolated(unsafe) public static let shared = StateTracker()
 
     private var dirty = false
     public private(set) var dirtyPaths: Set<String> = []

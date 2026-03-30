@@ -185,20 +185,36 @@ public enum LayoutEngine {
     ) {
         let totalSpacing = children.count > 1 ? Float(children.count - 1) * spacing : 0
 
-        // Partition children: measure fixed, count flexible
-        var fixedHeight: Float = 0
+        // Classify children: fixed (fixedHeight), flexible (Spacer), expandable (neither)
+        var totalFixed: Float = 0
         var flexCount = 0
+        var expandableCount = 0
+        var totalExpandableIntrinsic: Float = 0
 
         for child in children {
             if child.isFlexible {
                 flexCount += 1
+            } else if let fh = child.fixedHeight {
+                totalFixed += fh
             } else {
-                fixedHeight += child.cachedIntrinsicHeight
+                let ih = child.cachedIntrinsicHeight
+                totalExpandableIntrinsic += ih
+                expandableCount += 1
             }
         }
 
-        let remainingHeight = max(0, contentHeight - fixedHeight - totalSpacing)
-        let flexibleShare = flexCount == 0 ? Float(0) : remainingHeight / Float(flexCount)
+        let usedHeight = totalFixed + totalExpandableIntrinsic + totalSpacing
+        let remainingHeight = max(0, contentHeight - usedHeight)
+
+        let flexibleShare = flexCount > 0 ? remainingHeight / Float(flexCount) : Float(0)
+
+        // When no flexible children, expandable children absorb remaining space
+        let expandableBonus: Float
+        if flexCount == 0 && expandableCount > 0 && remainingHeight > 0 {
+            expandableBonus = remainingHeight / Float(expandableCount)
+        } else {
+            expandableBonus = 0
+        }
 
         // Layout pass: assign positions top-to-bottom
         var currentY = contentY
@@ -207,8 +223,10 @@ public enum LayoutEngine {
             let childHeight: Float
             if child.isFlexible {
                 childHeight = flexibleShare
+            } else if let fh = child.fixedHeight {
+                childHeight = fh
             } else {
-                childHeight = child.fixedHeight ?? child.cachedIntrinsicHeight
+                childHeight = child.cachedIntrinsicHeight + expandableBonus
             }
 
             let childWidth = child.fixedWidth ?? contentWidth
@@ -246,19 +264,41 @@ public enum LayoutEngine {
     ) {
         let totalSpacing = children.count > 1 ? Float(children.count - 1) * spacing : 0
 
-        var fixedWidth: Float = 0
+        // Classify children into three categories:
+        // 1. Fixed: has fixedWidth — gets exact width
+        // 2. Flexible: isFlexible (Spacer) — shares remaining space
+        // 3. Expandable: no fixedWidth, not flexible — gets intrinsic width,
+        //    but absorbs remaining space when there are no flexible children
+        var totalFixed: Float = 0
         var flexCount = 0
+        var expandableCount = 0
+        var totalExpandableIntrinsic: Float = 0
 
         for child in children {
             if child.isFlexible {
                 flexCount += 1
+            } else if let fw = child.fixedWidth {
+                totalFixed += fw
             } else {
-                fixedWidth += child.cachedIntrinsicWidth
+                let iw = child.cachedIntrinsicWidth
+                totalExpandableIntrinsic += iw
+                expandableCount += 1
             }
         }
 
-        let remainingWidth = max(0, contentWidth - fixedWidth - totalSpacing)
-        let flexibleShare = flexCount == 0 ? Float(0) : remainingWidth / Float(flexCount)
+        let usedWidth = totalFixed + totalExpandableIntrinsic + totalSpacing
+        let remainingWidth = max(0, contentWidth - usedWidth)
+
+        // Flexible children share remaining after all fixed + expandable intrinsic
+        let flexibleShare = flexCount > 0 ? remainingWidth / Float(flexCount) : Float(0)
+
+        // When no flexible children exist, expandable children absorb remaining space
+        let expandableBonus: Float
+        if flexCount == 0 && expandableCount > 0 && remainingWidth > 0 {
+            expandableBonus = remainingWidth / Float(expandableCount)
+        } else {
+            expandableBonus = 0
+        }
 
         var currentX = contentX
 
@@ -266,8 +306,10 @@ public enum LayoutEngine {
             let childWidth: Float
             if child.isFlexible {
                 childWidth = flexibleShare
+            } else if let fw = child.fixedWidth {
+                childWidth = fw
             } else {
-                childWidth = child.fixedWidth ?? child.cachedIntrinsicWidth
+                childWidth = child.cachedIntrinsicWidth + expandableBonus
             }
 
             let childHeight = child.fixedHeight ?? contentHeight
@@ -305,24 +347,45 @@ public enum LayoutEngine {
     ) {
         let totalSpacing = children.count > 1 ? Float(children.count - 1) * spacing : 0
 
-        var fixedWidth: Float = 0
+        var totalFixed: Float = 0
         var flexCount = 0
+        var expandableCount = 0
+        var totalExpandableIntrinsic: Float = 0
 
         for child in children {
             if child.isFlexible {
                 flexCount += 1
+            } else if let fw = child.fixedWidth {
+                totalFixed += fw
             } else {
-                fixedWidth += child.cachedIntrinsicWidth
+                let iw = child.cachedIntrinsicWidth
+                totalExpandableIntrinsic += iw
+                expandableCount += 1
             }
         }
 
-        let remainingWidth = max(0, contentWidth - fixedWidth - totalSpacing)
-        let flexibleShare = flexCount == 0 ? Float(0) : remainingWidth / Float(flexCount)
+        let usedWidth = totalFixed + totalExpandableIntrinsic + totalSpacing
+        let remainingWidth = max(0, contentWidth - usedWidth)
+        let flexibleShare = flexCount > 0 ? remainingWidth / Float(flexCount) : Float(0)
+
+        let expandableBonus: Float
+        if flexCount == 0 && expandableCount > 0 && remainingWidth > 0 {
+            expandableBonus = remainingWidth / Float(expandableCount)
+        } else {
+            expandableBonus = 0
+        }
 
         // First pass: assign widths and heights, calculate baselines
         var childSizes: [(width: Float, height: Float)] = []
         for child in children {
-            let w = child.isFlexible ? flexibleShare : (child.fixedWidth ?? child.cachedIntrinsicWidth)
+            let w: Float
+            if child.isFlexible {
+                w = flexibleShare
+            } else if let fw = child.fixedWidth {
+                w = fw
+            } else {
+                w = child.cachedIntrinsicWidth + expandableBonus
+            }
             let h = child.fixedHeight ?? child.cachedIntrinsicHeight
             childSizes.append((w, h))
         }

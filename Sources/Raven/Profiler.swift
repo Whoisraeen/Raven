@@ -20,7 +20,7 @@ import Foundation
 /// Profiler.shared.useSignposts = true  // macOS only
 /// ```
 public class Profiler: @unchecked Sendable {
-    @MainActor public static let shared = Profiler()
+    nonisolated(unsafe) public static let shared = Profiler()
 
     /// Profiling stages within a single frame.
     public enum Stage: String, CaseIterable, Sendable {
