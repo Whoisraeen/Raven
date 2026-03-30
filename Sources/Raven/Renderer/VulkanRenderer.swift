@@ -618,6 +618,10 @@ final class VulkanRenderer: @unchecked Sendable {
             fail("vkCreateSwapchainKHR(recreate) returned null")
         }
 
+        if let old = oldSwapchain {
+            vkDestroySwapchainKHR(device, old, nil)
+        }
+
         var swapchainImageCount: UInt32 = 0
         vkCheck(
             vkGetSwapchainImagesKHR(device, newSwapchain, &swapchainImageCount, nil),
@@ -888,7 +892,7 @@ final class VulkanRenderer: @unchecked Sendable {
                     // Draw the previous batch
                     let batchVertexCount = UInt32(i) * 6 - batchStart
                     if batchVertexCount > 0 {
-                        var s = clipRectToVkRect2D(currentClip, fallback: fullScissor)
+                        var s = clipRectToVkRect2D(clip: currentClip, fallback: fullScissor)
                         vkCmdSetScissor(commandBuffer, 0, 1, &s)
                         vkCmdDraw(commandBuffer, batchVertexCount, 1, batchStart, 0)
                     }
@@ -899,7 +903,7 @@ final class VulkanRenderer: @unchecked Sendable {
             // Draw final batch
             let remaining = vertexCount - batchStart
             if remaining > 0 {
-                var s = clipRectToVkRect2D(currentClip, fallback: fullScissor)
+                var s = clipRectToVkRect2D(clip: currentClip, fallback: fullScissor)
                 vkCmdSetScissor(commandBuffer, 0, 1, &s)
                 vkCmdDraw(commandBuffer, remaining, 1, batchStart, 0)
             }
@@ -933,16 +937,6 @@ final class VulkanRenderer: @unchecked Sendable {
         vkCheck(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer")
     }
 
-    /// Convert a ClipRect to a VkRect2D, clamped to valid range. Returns fallback if clip is .none.
-    private func clipRectToVkRect2D(_ clip: ClipRect, fallback: VkRect2D) -> VkRect2D {
-        if clip.isNone { return fallback }
-        let x = max(Int32(clip.x), 0)
-        let y = max(Int32(clip.y), 0)
-        let w = max(UInt32(clip.width), 1)
-        let h = max(UInt32(clip.height), 1)
-        return VkRect2D(offset: VkOffset2D(x: x, y: y), extent: VkExtent2D(width: w, height: h))
-    }
-
     // MARK: - Cleanup
 
     func destroy() {
@@ -968,4 +962,14 @@ final class VulkanRenderer: @unchecked Sendable {
 
         vkDestroyInstance(instance, nil)
     }
+}
+
+/// Convert a ClipRect to a VkRect2D, clamped to valid range. Returns fallback if clip is .none.
+func clipRectToVkRect2D(clip: ClipRect, fallback: VkRect2D) -> VkRect2D {
+    if clip.isNone { return fallback }
+    let x = max(Int32(clip.x), 0)
+    let y = max(Int32(clip.y), 0)
+    let w = max(UInt32(clip.width), 1)
+    let h = max(UInt32(clip.height), 1)
+    return VkRect2D(offset: VkOffset2D(x: x, y: y), extent: VkExtent2D(width: w, height: h))
 }

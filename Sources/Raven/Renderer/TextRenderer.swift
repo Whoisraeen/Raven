@@ -916,7 +916,37 @@ public class TextRenderer {
                            viewportSize: (Float, Float)) {
         if commands.isEmpty { return }
 
-        let vertices = generateVertices(from: commands)
+        struct TextBatch {
+            var clipRect: ClipRect
+            var vertexCount: UInt32
+        }
+
+        var vertices: [TextVertex] = []
+        var batches: [TextBatch] = []
+
+        var currentClip = commands.first?.clipRect ?? .none
+        var currentBatchCount: UInt32 = 0
+
+        for cmd in commands {
+            let cmdVertices = generateVertices(from: [cmd])
+            if cmdVertices.isEmpty { continue }
+
+            if cmd.clipRect != currentClip {
+                if currentBatchCount > 0 {
+                    batches.append(TextBatch(clipRect: currentClip, vertexCount: currentBatchCount))
+                }
+                currentClip = cmd.clipRect
+                currentBatchCount = 0
+            }
+
+            vertices.append(contentsOf: cmdVertices)
+            currentBatchCount += UInt32(cmdVertices.count)
+        }
+
+        if currentBatchCount > 0 {
+            batches.append(TextBatch(clipRect: currentClip, vertexCount: currentBatchCount))
+        }
+
         if vertices.isEmpty { return }
 
         // Upload to vertex buffer
@@ -962,7 +992,20 @@ public class TextRenderer {
             withUnsafePointer(to: &bufHandle) { bufPtr in
                 vkCmdBindVertexBuffers(commandBuffer, 0, 1, bufPtr, &offset)
             }
-            vkCmdDraw(commandBuffer, vertexCount, 1, 0, 0)
+
+            let fullScissor = VkRect2D(offset: VkOffset2D(x: 0, y: 0), extent: VkExtent2D(width: UInt32(viewportSize.0), height: UInt32(viewportSize.1)))
+            var vertexOffset: UInt32 = 0
+
+            for batch in batches {
+                var scissor = clipRectToVkRect2D(clip: batch.clipRect, fallback: fullScissor)
+                vkCmdSetScissor(commandBuffer, 0, 1, &scissor)
+                vkCmdDraw(commandBuffer, batch.vertexCount, 1, vertexOffset, 0)
+                vertexOffset += batch.vertexCount
+            }
+
+            // Reset scissor
+            var resetScissor = fullScissor
+            vkCmdSetScissor(commandBuffer, 0, 1, &resetScissor)
         }
     }
 

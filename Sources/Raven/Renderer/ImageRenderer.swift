@@ -314,10 +314,16 @@ public class ImageRenderer {
             }
         }
 
+        let fullScissor = VkRect2D(offset: VkOffset2D(x: 0, y: 0), extent: VkExtent2D(width: UInt32(viewportSize.0), height: UInt32(viewportSize.1)))
+
         // Draw each image with its own descriptor set (6 verts each)
         var vertexOffset: UInt32 = 0
         for cmd in commands {
             guard let tex = textureCache[cmd.textureId] else { continue }
+
+            var scissor = clipRectToVkRect2D(clip: cmd.clipRect, fallback: fullScissor)
+            vkCmdSetScissor(commandBuffer, 0, 1, &scissor)
+
             var dsHandle: VkDescriptorSet? = tex.descriptorSet
             withUnsafePointer(to: &dsHandle) { dsPtr in
                 vkCmdBindDescriptorSets(
@@ -328,6 +334,10 @@ public class ImageRenderer {
             vkCmdDraw(commandBuffer, 6, 1, vertexOffset, 0)
             vertexOffset += 6
         }
+
+        // Reset scissor
+        var resetScissor = fullScissor
+        vkCmdSetScissor(commandBuffer, 0, 1, &resetScissor)
     }
 
     // MARK: - Setup
