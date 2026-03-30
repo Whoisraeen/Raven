@@ -88,6 +88,27 @@ To make Raven a complete ecosystem, we need to provide highly opinionated, incre
 - **Peer-to-Peer (WebRTC/QUIC) Mesh Hubs:**
   - Integrating ultra-low latency mesh networking directly into the event loop. If developers want to build multiplayer game lobbies, remote desktop software (like Parsec), or secure file-sharing drops, they don't fight the browser's strict CORS/WebRTC policies. They get direct UDP socket access wrapped in clean Swift protocols.
 
+---
+
+## 4. Architectural & Developer Experience Extensions
+
+To fulfill the vision of rendering Electron and Tauri obsolete, Raven will incorporate foundational architectural improvements and developer experience (DX) enhancements:
+
+### **A. Standardized FFI Layer (Uniffi/Swift-Bridge)**
+- Moving beyond manual pointer shuffling by adopting robust bridging tools like `uniffi` (expanding `raven.udl`) to ensure type-safe, maintainable cross-language calls (Clipboard, File Dialogs, Tray) as the API surface grows.
+
+### **B. Reactive State Optimization (Dependency Tracking)**
+- Implementing a surgical dependency-tracking mechanism within the `@State` system (akin to SwiftUI's `AttributeGraph`). This ensures only the specific `LayoutNode` affected by a state change is re-evaluated, avoiding full-tree re-evaluations.
+
+### **C. Unified Styling (Theme Engine)**
+- Expanding the built-in `Theme` ecosystem through the Environment (`@Environment(\.theme)`). This gives developers a CSS-like, but fully type-safe design token system that propagates seamlessly down the view hierarchy.
+
+### **D. Advanced Layout (Grid & Flex)**
+- Introducing native `LazyVGrid` and `LazyHGrid` primitives essential for high-performance applications scrolling through thousands of items without loading everything into the layout engine memory at once.
+
+### **E. Raven CLI Enhancements**
+- Expanding the `raven` CLI to handle robust asset bundling (converting PNGs to Vulkan-optimized formats), cross-compilation setup, and scaffolding via `raven init`.
+
 ## Summary: The End Game
 
 Tauri's promise is "Desktop apps with lower RAM than Electron using WebKit." 

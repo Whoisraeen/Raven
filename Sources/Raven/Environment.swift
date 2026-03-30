@@ -54,6 +54,10 @@ private struct ColorSchemeKey: EnvironmentKey {
     static let defaultValue: ColorScheme = .dark
 }
 
+private struct ThemeKey: EnvironmentKey {
+    static let defaultValue: Theme = .current
+}
+
 extension EnvironmentValues {
     public var platform: Platform {
         get { self[PlatformKey.self] }
@@ -63,6 +67,11 @@ extension EnvironmentValues {
     public var colorScheme: ColorScheme {
         get { self[ColorSchemeKey.self] }
         set { self[ColorSchemeKey.self] = newValue }
+    }
+
+    public var theme: Theme {
+        get { self[ThemeKey.self] }
+        set { self[ThemeKey.self] = newValue }
     }
 }
 
