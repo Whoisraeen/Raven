@@ -44,6 +44,7 @@ public class LayoutNode {
     public var backgroundColor: Color? = nil
     public var foregroundColor: Color? = nil
     public var cornerRadius: Float = 0
+    public var blurRadius: Float = 0
 
     /// Border
     public var borderColor: Color? = nil
@@ -106,9 +107,8 @@ public class LayoutNode {
     /// For text nodes, this is the distance from the top to the text baseline.
     public var baselineOffset: Float {
         if text != nil {
-            // Approximate: baseline is ~75% of font height from top
-            let textSize = FontManager.shared.measureText(text ?? "Ay", fontSize: fontSize)
-            return padding.top + textSize.height * 0.75
+            let metrics = FontManager.shared.getMetrics(fontSize: fontSize)
+            return padding.top + metrics.ascent
         }
         // For containers, use the first text child's baseline
         for child in children {

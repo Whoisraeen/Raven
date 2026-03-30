@@ -8,7 +8,19 @@ public final class WindowManager: @unchecked Sendable {
     // The current main SDL Window handle. Assigned by RavenApp during startup.
     public var window: OpaquePointer?
 
+    /// The DPI scale factor of the current display (e.g., 2.0 for Retina).
+    /// All layout logic uses logical pixels, which are multiplied by this scale
+    /// for physical pixel rendering.
+    public var scaleFactor: Float = 1.0
+
     private init() {}
+
+    /// Query the current display scale factor from SDL and update the internal state.
+    public func refreshScaleFactor() {
+        guard let window = window else { return }
+        self.scaleFactor = SDL_GetWindowDisplayScale(window)
+        RavenLogger.info("Display scale updated: \(scaleFactor)x")
+    }
 
     /// Hide or show the default OS window chrome (title bar, borders).
     /// Used when building entirely custom title bars in Raven UI.

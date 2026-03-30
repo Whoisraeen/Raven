@@ -14,6 +14,7 @@ import Darwin
 
 let sdlWindowResizableFlag: SDL_WindowFlags = 0x0000000000000020
 let sdlWindowVulkanFlag: SDL_WindowFlags = 0x0000000010000000
+let sdlWindowHighPixelDensityFlag: SDL_WindowFlags = 0x0000000000002000
 
 let vkQueueGraphicsBit: VkQueueFlags = 0x00000001
 let vkImageUsageColorAttachmentBit: VkImageUsageFlags = 0x00000010
@@ -147,21 +148,37 @@ func readFileBytes(atPath path: String) throws -> [UInt8] {
 
 // MARK: - Vertex Data
 
-public struct QuadVertex {
+public struct QuadVertex: Sendable {
     public var posX: Float
     public var posY: Float
     public var r: Float
     public var g: Float
     public var b: Float
     public var a: Float
+    
+    // SDF properties
+    public var rectMinX: Float
+    public var rectMinY: Float
+    public var rectMaxX: Float
+    public var rectMaxY: Float
+    public var cornerRadius: Float
+    public var shadowRadius: Float
 
-    public init(_ x: Float, _ y: Float, _ r: Float, _ g: Float, _ b: Float, _ a: Float = 1.0) {
+    public init(_ x: Float, _ y: Float, _ r: Float, _ g: Float, _ b: Float, _ a: Float = 1.0,
+                rectMinX: Float = 0, rectMinY: Float = 0, rectMaxX: Float = 0, rectMaxY: Float = 0,
+                cornerRadius: Float = 0, shadowRadius: Float = 0) {
         self.posX = x
         self.posY = y
         self.r = r
         self.g = g
         self.b = b
         self.a = a
+        self.rectMinX = rectMinX
+        self.rectMinY = rectMinY
+        self.rectMaxX = rectMaxX
+        self.rectMaxY = rectMaxY
+        self.cornerRadius = cornerRadius
+        self.shadowRadius = shadowRadius
     }
 }
 
@@ -189,7 +206,7 @@ public struct ClipRect: Equatable, Sendable {
     }
 }
 
-public struct Quad {
+public struct Quad: Sendable {
     public var x: Float
     public var y: Float
     public var width: Float
@@ -199,9 +216,12 @@ public struct Quad {
     public var b: Float
     public var a: Float
 
+    public var cornerRadius: Float = 0
+    public var shadowRadius: Float = 0
     public var clipRect: ClipRect = .none
 
-    public init(x: Float, y: Float, width: Float, height: Float, r: Float, g: Float, b: Float, a: Float = 1.0, clipRect: ClipRect = .none) {
+    public init(x: Float, y: Float, width: Float, height: Float, r: Float, g: Float, b: Float, a: Float = 1.0, 
+                cornerRadius: Float = 0, shadowRadius: Float = 0, clipRect: ClipRect = .none) {
         self.x = x
         self.y = y
         self.width = width
@@ -210,6 +230,8 @@ public struct Quad {
         self.g = g
         self.b = b
         self.a = a
+        self.cornerRadius = cornerRadius
+        self.shadowRadius = shadowRadius
         self.clipRect = clipRect
     }
 
@@ -220,15 +242,34 @@ public struct Quad {
         let top = y
         let bottom = y + height
 
+        // For SDF rendering, the quad geometry must be expanded by the shadow radius
+        // to ensure the soft edges aren't clipped by the primitive bounds.
+        let expandedLeft = left - shadowRadius
+        let expandedRight = right + shadowRadius
+        let expandedTop = top - shadowRadius
+        let expandedBottom = bottom + shadowRadius
+
         return [
-            // Triangle 1: top-left, bottom-left, bottom-right
-            QuadVertex(left, top, r, g, b, a),
-            QuadVertex(left, bottom, r, g, b, a),
-            QuadVertex(right, bottom, r, g, b, a),
-            // Triangle 2: top-left, bottom-right, top-right
-            QuadVertex(left, top, r, g, b, a),
-            QuadVertex(right, bottom, r, g, b, a),
-            QuadVertex(right, top, r, g, b, a),
+            // Triangle 1
+            QuadVertex(expandedLeft, expandedTop, r, g, b, a, 
+                       rectMinX: left, rectMinY: top, rectMaxX: right, rectMaxY: bottom, 
+                       cornerRadius: cornerRadius, shadowRadius: shadowRadius),
+            QuadVertex(expandedLeft, expandedBottom, r, g, b, a, 
+                       rectMinX: left, rectMinY: top, rectMaxX: right, rectMaxY: bottom, 
+                       cornerRadius: cornerRadius, shadowRadius: shadowRadius),
+            QuadVertex(expandedRight, expandedBottom, r, g, b, a, 
+                       rectMinX: left, rectMinY: top, rectMaxX: right, rectMaxY: bottom, 
+                       cornerRadius: cornerRadius, shadowRadius: shadowRadius),
+            // Triangle 2
+            QuadVertex(expandedLeft, expandedTop, r, g, b, a, 
+                       rectMinX: left, rectMinY: top, rectMaxX: right, rectMaxY: bottom, 
+                       cornerRadius: cornerRadius, shadowRadius: shadowRadius),
+            QuadVertex(expandedRight, expandedBottom, r, g, b, a, 
+                       rectMinX: left, rectMinY: top, rectMaxX: right, rectMaxY: bottom, 
+                       cornerRadius: cornerRadius, shadowRadius: shadowRadius),
+            QuadVertex(expandedRight, expandedTop, r, g, b, a, 
+                       rectMinX: left, rectMinY: top, rectMaxX: right, rectMaxY: bottom, 
+                       cornerRadius: cornerRadius, shadowRadius: shadowRadius),
         ]
     }
 }

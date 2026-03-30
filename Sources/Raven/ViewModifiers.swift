@@ -174,9 +174,21 @@ public struct OnDisappearModifier: ViewModifier {
     }
 }
 
+/// Blur modifier — adds a Gaussian blur to the node's content
+public struct BlurModifier: ViewModifier {
+    public let radius: Float
+    public func apply(to node: LayoutNode) {
+        node.blurRadius = radius
+    }
+}
+
 // MARK: - View Extension Methods
 
 extension View {
+    /// Add a Gaussian blur to the view.
+    public func blur(radius: Float) -> ModifiedView<Self, BlurModifier> {
+        ModifiedView(content: self, modifier: BlurModifier(radius: radius))
+    }
     /// Add padding around the view.
     public func padding(_ value: Float) -> ModifiedView<Self, PaddingModifier> {
         ModifiedView(content: self, modifier: PaddingModifier(insets: EdgeInsets(value)))

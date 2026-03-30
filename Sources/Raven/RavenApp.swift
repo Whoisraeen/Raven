@@ -6,6 +6,61 @@ import ucrt
 #endif
 
 
+// MARK: - RenderThread
+
+/// Manages a dedicated thread for Vulkan command recording and submission.
+/// Decouples the UI thread (layout/view rebuild) from the GPU (VSync/sync).
+private final class RenderThread: @unchecked Sendable {
+    private let renderer: VulkanRenderer
+    private let queue = DispatchQueue(label: "com.raven.render", qos: .userInteractive)
+    
+    private let lock = RavenLock()
+    private var pendingFrame: RenderFrame?
+    private var isBusy = false
+
+    init(renderer: VulkanRenderer) {
+        self.renderer = renderer
+    }
+
+    /// Submit a new frame to the render thread.
+    /// Returns true if the frame was accepted, false if the thread is busy.
+    func submit(frame: RenderFrame) -> Bool {
+        return lock.withLock {
+            if isBusy { return false }
+            pendingFrame = frame
+            isBusy = true
+            
+            queue.async { [weak self] in
+                self?.processFrame()
+            }
+            return true
+        }
+    }
+
+    private func processFrame() {
+        let frame = lock.withLock { pendingFrame }
+        guard let frame = frame else {
+            lock.withLock { isBusy = false }
+            return
+        }
+
+        // Texture updates MUST happen on the render thread
+        // (Vulkan resources are owned/managed here)
+        for imgCmd in frame.imageCommands {
+            renderer.imageRenderer.loadImage(path: imgCmd.textureId)
+        }
+        renderer.textRenderer.updateAtlasIfNeeded()
+
+        // Submit the frame to Vulkan
+        renderer.drawFrame(frame)
+
+        lock.withLock {
+            pendingFrame = nil
+            isBusy = false
+        }
+    }
+}
+
 // MARK: - RavenApp
 
 /// The main entry point for a Raven application.
@@ -51,7 +106,7 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         }
         defer { SDL_Quit() }
 
-        let windowFlags = sdlWindowResizableFlag | sdlWindowVulkanFlag
+        let windowFlags = sdlWindowResizableFlag | sdlWindowVulkanFlag | sdlWindowHighPixelDensityFlag
 
         guard let window = SDL_CreateWindow(title, Int32(width), Int32(height), windowFlags) else {
             fail("SDL_CreateWindow failed: \(currentSDLError())")
@@ -60,6 +115,7 @@ public class RavenApp<Content: View>: @unchecked Sendable {
 
         // Attach to the WindowManager for global native configuration
         WindowManager.shared.window = window
+        WindowManager.shared.refreshScaleFactor()
 
         RavenLogger.info("Window created, initializing Vulkan renderer...")
 
@@ -67,6 +123,9 @@ public class RavenApp<Content: View>: @unchecked Sendable {
         let renderer = VulkanRenderer(window: window)
         RavenLogger.info("Renderer initialized successfully")
         defer { renderer.destroy() }
+
+        // Initialize Render Thread
+        let renderThread = RenderThread(renderer: renderer)
 
         // Event types
         let quitEventType = UInt32(SDL_EVENT_QUIT.rawValue)
@@ -184,19 +243,21 @@ public class RavenApp<Content: View>: @unchecked Sendable {
 
                 case mouseButtonDownType:
                     // Left mouse button click
-                    let mouseX = Float(event.button.x)
-                    let mouseY = Float(event.button.y)
+                    let scale = WindowManager.shared.scaleFactor
+                    let mouseX = Float(event.button.x) / scale
+                    let mouseY = Float(event.button.y) / scale
                     if let root = rootNode {
                         EventDispatcher.handleClick(x: mouseX, y: mouseY, root: root)
                     }
 
                 case UInt32(SDL_EVENT_MOUSE_WHEEL.rawValue):
                     // Mouse wheel — scroll the nearest ScrollView under cursor
+                    let scale = WindowManager.shared.scaleFactor
                     let scrollAmount = Float(event.wheel.y) * -30.0  // negative = scroll down
                     if let root = rootNode {
                         // Find the scroll container under the mouse
-                        if let scrollNode = findScrollNode(x: Float(event.wheel.mouse_x),
-                                                           y: Float(event.wheel.mouse_y),
+                        if let scrollNode = findScrollNode(x: Float(event.wheel.mouse_x) / scale,
+                                                           y: Float(event.wheel.mouse_y) / scale,
                                                            in: root) {
                             if scrollNode.platform == .macOS {
                                 // Elastic/Smooth scrolling for macOS feel
@@ -218,8 +279,9 @@ public class RavenApp<Content: View>: @unchecked Sendable {
 
                 case UInt32(SDL_EVENT_MOUSE_MOTION.rawValue):
                     // Mouse motion — handle slider drag
-                    let mouseX = Float(event.motion.x)
-                    let mouseY = Float(event.motion.y)
+                    let scale = WindowManager.shared.scaleFactor
+                    let mouseX = Float(event.motion.x) / scale
+                    let mouseY = Float(event.motion.y) / scale
                     EventDispatcher.handleMouseMotion(x: mouseX, y: mouseY)
 
                 case UInt32(SDL_EVENT_MOUSE_BUTTON_UP.rawValue):
@@ -229,6 +291,12 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                 case UInt32(SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED.rawValue),
                      UInt32(SDL_EVENT_WINDOW_RESIZED.rawValue):
                     renderer.recreateSwapchain()
+                    StateTracker.shared.markDirty()
+
+                case UInt32(SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED.rawValue):
+                    WindowManager.shared.refreshScaleFactor()
+                    renderer.recreateSwapchain()
+                    StateTracker.shared.markDirty()
 
                 default:
                     break
@@ -250,7 +318,7 @@ public class RavenApp<Content: View>: @unchecked Sendable {
             }
 
             if isRunning {
-                var dirtyRect: VkRect2D? = nil
+                var currentRenderDirtyRect: RenderDirtyRect? = nil
 
                 if needsRebuild {
                     // Re-build view tree (captures current state values)
@@ -260,8 +328,9 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                     let resolved = ViewResolver.resolve(content, path: "root")
                     profiler.end(.viewResolve)
 
-                    let viewportWidth = Float(renderer.swapchainExtent.width)
-                    let viewportHeight = Float(renderer.swapchainExtent.height)
+                    let scale = WindowManager.shared.scaleFactor
+                    let viewportWidth = Float(renderer.swapchainExtent.width) / scale
+                    let viewportHeight = Float(renderer.swapchainExtent.height) / scale
 
                     profiler.begin(.layout)
                     LayoutEngine.resolve(
@@ -290,12 +359,11 @@ public class RavenApp<Content: View>: @unchecked Sendable {
 
                         if minX != .infinity {
                             // Expand slightly to avoid sub-pixel clipping artifacts
-                            let x = Int32(max(0, floorf(minX - 1)))
-                            let y = Int32(max(0, floorf(minY - 1)))
-                            let w = UInt32(ceilf(maxX - minX + 2))
-                            let h = UInt32(ceilf(maxY - minY + 2))
-                            dirtyRect = VkRect2D(offset: VkOffset2D(x: x, y: y),
-                                                 extent: VkExtent2D(width: w, height: h))
+                            let x = Int32(max(0, floorf((minX - 1) * scale)))
+                            let y = Int32(max(0, floorf((minY - 1) * scale)))
+                            let w = UInt32(ceilf((maxX - minX + 2) * scale))
+                            let h = UInt32(ceilf((maxY - minY + 2) * scale))
+                            currentRenderDirtyRect = RenderDirtyRect(x: x, y: y, width: w, height: h)
                         }
                         currentDirtyPaths.removeAll()
                     }
@@ -319,14 +387,6 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                     cachedImageCommands = renderOutput.imageCommands
                     profiler.end(.renderCollect)
 
-                    // Preload any new image textures
-                    for imgCmd in cachedImageCommands {
-                        renderer.imageRenderer.loadImage(path: imgCmd.textureId)
-                    }
-
-                    // Update font atlas texture if needed
-                    renderer.textRenderer.updateAtlasIfNeeded()
-
                     needsRebuild = false
 
                     // Restore state after hot reload (if a snapshot was taken)
@@ -335,12 +395,33 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                     }
                 }
 
-                // Always present a frame (Vulkan swapchain expects continuous presentation)
+                // Always submit a frame to the render thread (it handles VSync synchronization)
                 profiler.begin(.gpuSubmit)
-                renderer.drawFrame(quads: cachedQuads,
-                                   textCommands: cachedTextCommands,
-                                   imageCommands: cachedImageCommands,
-                                   dirtyRect: dirtyRect)
+                let scale = WindowManager.shared.scaleFactor
+                let output = RenderOutput(
+                    quads: cachedQuads,
+                    textCommands: cachedTextCommands,
+                    imageCommands: cachedImageCommands
+                ).scaled(by: scale)
+
+                let frame = RenderFrame(
+                    quads: output.quads,
+                    textCommands: output.textCommands,
+                    imageCommands: output.imageCommands,
+                    viewportWidth: renderer.swapchainExtent.width,
+                    viewportHeight: renderer.swapchainExtent.height,
+                    dirtyRect: currentRenderDirtyRect
+                )
+                    textCommands: cachedTextCommands,
+                    imageCommands: cachedImageCommands,
+                    viewportWidth: renderer.swapchainExtent.width,
+                    viewportHeight: renderer.swapchainExtent.height,
+                    dirtyRect: currentRenderDirtyRect
+                )
+                
+                // Only submit if the render thread isn't still busy with a previous frame
+                // This acts as a simple backpressure mechanism (double-buffering)
+                _ = renderThread.submit(frame: frame)
                 profiler.end(.gpuSubmit)
 
                 profiler.end(.frameTotal)

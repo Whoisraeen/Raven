@@ -224,7 +224,7 @@ final class VulkanPipeline {
         ]
 
         // --- Vertex Input ---
-        // QuadVertex: posX, posY (2 floats) + r, g, b, a (4 floats) = 24 bytes
+        // QuadVertex: pos(2) + rgba(4) + rectMin(2) + rectMax(2) + radius(1) + shadow(1) = 12 floats = 48 bytes
         var bindingDescription = VkVertexInputBindingDescription(
             binding: 0,
             stride: UInt32(MemoryLayout<QuadVertex>.stride),
@@ -245,6 +245,34 @@ final class VulkanPipeline {
                 binding: 0,
                 format: VK_FORMAT_R32G32B32A32_SFLOAT,
                 offset: UInt32(MemoryLayout<Float>.size * 2)
+            ),
+            // location 2: vec2 rectMin
+            VkVertexInputAttributeDescription(
+                location: 2,
+                binding: 0,
+                format: VK_FORMAT_R32G32_SFLOAT,
+                offset: UInt32(MemoryLayout<Float>.size * 6)
+            ),
+            // location 3: vec2 rectMax
+            VkVertexInputAttributeDescription(
+                location: 3,
+                binding: 0,
+                format: VK_FORMAT_R32G32_SFLOAT,
+                offset: UInt32(MemoryLayout<Float>.size * 8)
+            ),
+            // location 4: float cornerRadius
+            VkVertexInputAttributeDescription(
+                location: 4,
+                binding: 0,
+                format: VK_FORMAT_R32_SFLOAT,
+                offset: UInt32(MemoryLayout<Float>.size * 10)
+            ),
+            // location 5: float shadowRadius
+            VkVertexInputAttributeDescription(
+                location: 5,
+                binding: 0,
+                format: VK_FORMAT_R32_SFLOAT,
+                offset: UInt32(MemoryLayout<Float>.size * 11)
             ),
         ]
 

@@ -23,7 +23,7 @@ public struct TextVertex {
 }
 
 /// A text draw command — a positioned string with a color.
-public struct TextDrawCommand {
+public struct TextDrawCommand: Sendable {
     public var text: String
     public var x: Float
     public var y: Float

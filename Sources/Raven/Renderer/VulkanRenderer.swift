@@ -1,6 +1,43 @@
 import CSDL3
 import CVulkan
 
+// MARK: - RenderFrame
+
+/// Data required to render a single frame.
+public struct RenderFrame: Sendable {
+    public let quads: [Quad]
+    public let textCommands: [TextDrawCommand]
+    public let imageCommands: [ImageDrawCommand]
+    public let viewportWidth: UInt32
+    public let viewportHeight: UInt32
+    public let dirtyRect: RenderDirtyRect?
+
+    public init(quads: [Quad], textCommands: [TextDrawCommand], imageCommands: [ImageDrawCommand],
+                viewportWidth: UInt32, viewportHeight: UInt32, dirtyRect: RenderDirtyRect? = nil) {
+        self.quads = quads
+        self.textCommands = textCommands
+        self.imageCommands = imageCommands
+        self.viewportWidth = viewportWidth
+        self.viewportHeight = viewportHeight
+        self.dirtyRect = dirtyRect
+    }
+}
+
+public struct RenderDirtyRect: Sendable {
+    public var x: Int32
+    public var y: Int32
+    public var width: UInt32
+    public var height: UInt32
+
+    public init(x: Int32, y: Int32, width: UInt32, height: UInt32) {
+        self.x = x; self.y = y; self.width = width; self.height = height
+    }
+
+    func toVkRect2D() -> VkRect2D {
+        VkRect2D(offset: VkOffset2D(x: x, y: y), extent: VkExtent2D(width: width, height: height))
+    }
+}
+
 // MARK: - VulkanRenderer
 
 /// Encapsulates the complete Vulkan rendering state.
@@ -662,17 +699,18 @@ final class VulkanRenderer: @unchecked Sendable {
     private var pendingTextCommands: [TextDrawCommand] = []
     private var pendingImageCommands: [ImageDrawCommand] = []
 
-    func drawFrame(quads: [Quad], textCommands: [TextDrawCommand] = [],
-                   imageCommands: [ImageDrawCommand] = [], dirtyRect: VkRect2D? = nil) {
+    /// Draw a frame using the provided RenderFrame data.
+    /// This is typically called from a dedicated render thread.
+    func drawFrame(_ frame: RenderFrame) {
         // Upload vertex data
-        let allVertices = quads.flatMap { $0.vertices() }
+        let allVertices = frame.quads.flatMap { $0.vertices() }
         let vertexDataSize = VkDeviceSize(MemoryLayout<QuadVertex>.stride * allVertices.count)
 
-        self.pendingQuads = quads
-        self.pendingTextCommands = textCommands
-        self.pendingImageCommands = imageCommands
+        self.pendingQuads = frame.quads
+        self.pendingTextCommands = frame.textCommands
+        self.pendingImageCommands = frame.imageCommands
 
-        if allVertices.isEmpty && textCommands.isEmpty && imageCommands.isEmpty { return }
+        if allVertices.isEmpty && frame.textCommands.isEmpty && frame.imageCommands.isEmpty { return }
 
         // Recreate buffer with geometric growth (2x) to avoid per-frame reallocation
         if vertexBuffer == nil || vertexBuffer!.size < vertexDataSize {
@@ -733,7 +771,7 @@ final class VulkanRenderer: @unchecked Sendable {
             vkCheck(vkResetCommandBuffer(commandBuffer, 0), "vkResetCommandBuffer")
 
             // Record commands
-            recordCommandBuffer(commandBuffer: commandBuffer, imageIndex: imageIndex, dirtyRect: dirtyRect)
+            recordCommandBuffer(commandBuffer: commandBuffer, imageIndex: imageIndex, dirtyRect: frame.dirtyRect?.toVkRect2D())
 
             // Submit
             var waitSemaphoreHandle: VkSemaphore? = imageAvailableSemaphore

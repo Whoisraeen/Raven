@@ -2,12 +2,78 @@ import CVulkan
 
 // MARK: - RenderCollector
 
-/// Walks a resolved LayoutNode tree and produces arrays of Quads, TextDrawCommands,
-/// and ImageDrawCommands ready to be rendered by the VulkanRenderer.
-public struct RenderOutput {
+/// A standalone renderable layer (e.g., a blurred sub-tree).
+public struct RenderLayer: Sendable {
     public var quads: [Quad] = []
     public var textCommands: [TextDrawCommand] = []
     public var imageCommands: [ImageDrawCommand] = []
+    public var blurRadius: Float = 0
+    public var opacity: Float = 1.0
+    // The bounds of this layer in logical pixels
+    public var x: Float = 0
+    public var y: Float = 0
+    public var width: Float = 0
+    public var height: Float = 0
+}
+
+/// Walks a resolved LayoutNode tree and produces arrays of Quads, TextDrawCommands,
+/// and ImageDrawCommands ready to be rendered by the VulkanRenderer.
+public struct RenderOutput: Sendable {
+    public var quads: [Quad] = []
+    public var textCommands: [TextDrawCommand] = []
+    public var imageCommands: [ImageDrawCommand] = []
+    public var layers: [RenderLayer] = []
+
+    /// Scale all coordinates and sizes in this output by a factor (e.g., DPI scale).
+    public func scaled(by factor: Float) -> RenderOutput {
+        if factor == 1.0 { return self }
+        var scaled = RenderOutput()
+        scaled.quads = quads.map { q in
+            var n = q
+            n.x *= factor; n.y *= factor; n.width *= factor; n.height *= factor
+            n.clipRect.x *= factor; n.clipRect.y *= factor; n.clipRect.width *= factor; n.clipRect.height *= factor
+            return n
+        }
+        scaled.textCommands = textCommands.map { t in
+            var n = t
+            n.x *= factor; n.y *= factor; n.scale *= factor; n.maxWidth *= factor
+            n.clipRect.x *= factor; n.clipRect.y *= factor; n.clipRect.width *= factor; n.clipRect.height *= factor
+            return n
+        }
+        scaled.imageCommands = imageCommands.map { i in
+            var n = i
+            n.x *= factor; n.y *= factor; n.width *= factor; n.height *= factor
+            n.clipRect.x *= factor; n.clipRect.y *= factor; n.clipRect.width *= factor; n.clipRect.height *= factor
+            return n
+        }
+        scaled.layers = layers.map { l in
+            var n = l
+            n.x *= factor; n.y *= factor; n.width *= factor; n.height *= factor
+            n.blurRadius *= factor
+            // Inner commands within the layer should be relative to layer (0,0) or absolute?
+            // For now, let's keep them absolute and scale them.
+            n.quads = l.quads.map { q in
+                var nq = q
+                nq.x *= factor; nq.y *= factor; nq.width *= factor; nq.height *= factor
+                nq.clipRect.x *= factor; nq.clipRect.y *= factor; nq.clipRect.width *= factor; nq.clipRect.height *= factor
+                return nq
+            }
+            n.textCommands = l.textCommands.map { t in
+                var nt = t
+                nt.x *= factor; nt.y *= factor; nt.scale *= factor; nt.maxWidth *= factor
+                nt.clipRect.x *= factor; nt.clipRect.y *= factor; nt.clipRect.width *= factor; nt.clipRect.height *= factor
+                return nt
+            }
+            n.imageCommands = l.imageCommands.map { i in
+                var ni = i
+                ni.x *= factor; ni.y *= factor; ni.width *= factor; ni.height *= factor
+                ni.clipRect.x *= factor; ni.clipRect.y *= factor; ni.clipRect.width *= factor; ni.clipRect.height *= factor
+                return ni
+            }
+            return n
+        }
+        return scaled
+    }
 }
 
 public enum RenderCollector {
@@ -23,6 +89,30 @@ public enum RenderCollector {
         // Skip hidden nodes entirely
         if node.isHidden { return }
 
+        // If this node has a blur, we collect its content into a separate layer
+        if node.blurRadius > 0 {
+            var layer = RenderLayer()
+            layer.blurRadius = node.blurRadius
+            layer.opacity = node.opacity
+            layer.x = node.x; layer.y = node.y
+            layer.width = node.width; layer.height = node.height
+            
+            // Recursively collect node content and its children into the layer
+            // Note: We pass a temporary RenderOutput to capture the commands
+            var layerOutput = RenderOutput()
+            collectNodeContent(node, clip: .none, into: &layerOutput)
+            
+            layer.quads = layerOutput.quads
+            layer.textCommands = layerOutput.textCommands
+            layer.imageCommands = layerOutput.imageCommands
+            output.layers.append(layer)
+            return
+        }
+
+        collectNodeContent(node, clip: clip, into: &output)
+    }
+
+    private static func collectNodeContent(_ node: LayoutNode, clip: ClipRect, into output: inout RenderOutput) {
         // Draw border if present (rendered as four thin quads)
         if let bc = node.borderColor, node.borderWidth > 0 {
             let bw = node.borderWidth
@@ -39,13 +129,14 @@ public enum RenderCollector {
 
         // Draw shadow if present (rendered behind background)
         if let sc = node.shadowColor, node.shadowRadius > 0 {
-            let r = node.shadowRadius
             output.quads.append(Quad(
-                x: node.x + node.shadowOffsetX - r,
-                y: node.y + node.shadowOffsetY - r,
-                width: node.width + r * 2,
-                height: node.height + r * 2,
+                x: node.x + node.shadowOffsetX,
+                y: node.y + node.shadowOffsetY,
+                width: node.width,
+                height: node.height,
                 r: sc.r, g: sc.g, b: sc.b, a: sc.a,
+                cornerRadius: node.cornerRadius,
+                shadowRadius: node.shadowRadius,
                 clipRect: clip
             ))
         }
@@ -56,6 +147,7 @@ public enum RenderCollector {
                 x: node.x, y: node.y,
                 width: node.width, height: node.height,
                 r: bg.r, g: bg.g, b: bg.b, a: bg.a,
+                cornerRadius: node.cornerRadius,
                 clipRect: clip
             ))
         }

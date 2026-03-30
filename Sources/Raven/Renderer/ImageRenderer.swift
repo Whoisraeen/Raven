@@ -4,7 +4,7 @@ import CVulkan
 // MARK: - ImageDrawCommand
 
 /// A draw command for rendering a loaded image texture.
-public struct ImageDrawCommand {
+public struct ImageDrawCommand: Sendable {
     public let textureId: String   // Unique key (file path)
     public var x: Float
     public var y: Float
