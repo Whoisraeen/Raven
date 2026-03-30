@@ -62,7 +62,7 @@ public class ImageRenderer {
 
     public init(device: VkDevice, physicalDevice: VkPhysicalDevice,
                 queue: VkQueue, commandPool: VkCommandPool,
-                renderPass: VkRenderPass) {
+                renderPass: VkRenderPass, pipelineCache: VkPipelineCache?) {
         self.device = device
         self.physicalDevice = physicalDevice
         self.queue = queue
@@ -70,7 +70,7 @@ public class ImageRenderer {
 
         createSampler()
         createDescriptorResources()
-        createImagePipeline(renderPass: renderPass)
+        createImagePipeline(renderPass: renderPass, pipelineCache: pipelineCache)
     }
 
     // MARK: - Texture Loading
@@ -385,7 +385,7 @@ public class ImageRenderer {
                 "vkCreateDescriptorPool(image)")
     }
 
-    private func createImagePipeline(renderPass: VkRenderPass) {
+    private func createImagePipeline(renderPass: VkRenderPass, pipelineCache: VkPipelineCache?) {
         // Push constant range (viewport size)
         var pushConstantRange = VkPushConstantRange(
             stageFlags: vkShaderStageVertexBit,
@@ -560,7 +560,7 @@ public class ImageRenderer {
                         )
 
                         vkCheck(
-                            vkCreateGraphicsPipelines(device, nil, 1, &pipelineInfo, nil, &graphicsPipeline),
+                            vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nil, &graphicsPipeline),
                             "vkCreateGraphicsPipelines(image)"
                         )
                     }

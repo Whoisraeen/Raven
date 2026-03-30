@@ -80,9 +80,4 @@ Goal: Get a window on screen with basic UI elements rendering via Vulkan.
 
 ---
 
-## Known Issues (Current)
 
-1. **Thread safety** — All singletons are main-thread-only. Documented, safe for now, needs isolation if async work is introduced.
-2. **Hardcoded component styling** — Button, TextField, Sheet, SidebarItem have baked-in dimensions. Should be theme-configurable.
-3. **Version scattered across 5 files** — No single source of truth for "0.1.0".
-4. **No pipeline cache** — Vulkan pipelines recreated from scratch every launch.

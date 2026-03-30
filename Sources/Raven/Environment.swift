@@ -119,7 +119,7 @@ extension View {
 /// ViewResolver pushes/pops scopes as it enters/leaves subtrees with environment overrides.
 /// Thread-safe via RavenLock.
 public class EnvironmentStore: @unchecked Sendable {
-    public static let shared = EnvironmentStore()
+    @MainActor public static let shared = EnvironmentStore()
     private init() {}
 
     private var stack: [EnvironmentValues] = [EnvironmentValues()]

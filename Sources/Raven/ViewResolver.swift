@@ -198,7 +198,12 @@ public enum ViewResolver {
         let textNode = LayoutNode()
         textNode.text = button.label
         textNode.foregroundColor = .buttonText
-        textNode.padding = EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+        textNode.padding = EdgeInsets(
+            top: theme.spacing.sm,
+            leading: theme.spacing.lg,
+            bottom: theme.spacing.sm,
+            trailing: theme.spacing.lg
+        )
         
         node.children = [textNode]
         node.accessibilityRole = .button
@@ -248,9 +253,10 @@ public enum ViewResolver {
     // MARK: - Toggle
 
     private static func resolveToggle(_ toggle: Toggle, path: String) -> LayoutNode {
+        let theme = Theme.current
         let node = LayoutNode()
         node.stackAxis = .horizontal
-        node.spacing = 10
+        node.spacing = theme.spacing.md
         node.verticalAlignment = .center
         node.isToggle = true
         node.toggleBinding = toggle.isOn

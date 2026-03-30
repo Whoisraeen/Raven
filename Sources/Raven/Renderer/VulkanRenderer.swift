@@ -92,7 +92,8 @@ final class VulkanRenderer: @unchecked Sendable {
             physicalDevice: physicalDevice,
             queue: queue,
             commandPool: commandPool,
-            renderPass: pipeline.renderPass
+            renderPass: pipeline.renderPass,
+            pipelineCache: pipelineCache
         )
 
         // --- Image Renderer ---
@@ -101,7 +102,8 @@ final class VulkanRenderer: @unchecked Sendable {
             physicalDevice: physicalDevice,
             queue: queue,
             commandPool: commandPool,
-            renderPass: pipeline.renderPass
+            renderPass: pipeline.renderPass,
+            pipelineCache: pipelineCache
         )
 
         RavenLogger.info("Vulkan renderer initialized successfully.")

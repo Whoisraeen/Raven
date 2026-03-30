@@ -11,7 +11,7 @@ import Foundation
 
 public class FontManager: @unchecked Sendable {
     /// Singleton instance
-    public static let shared = FontManager()
+    @MainActor public static let shared = FontManager()
 
     /// Lock protecting glyph cache and atlas data
     private let lock = RavenLock()

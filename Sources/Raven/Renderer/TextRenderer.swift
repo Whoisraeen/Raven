@@ -79,7 +79,7 @@ public class TextRenderer {
 
     public init(device: VkDevice, physicalDevice: VkPhysicalDevice,
                 queue: VkQueue, commandPool: VkCommandPool,
-                renderPass: VkRenderPass) {
+                renderPass: VkRenderPass, pipelineCache: VkPipelineCache?) {
         self.device = device
         self.physicalDevice = physicalDevice
         self.queue = queue
@@ -93,7 +93,7 @@ public class TextRenderer {
         RavenLogger.debug("TextRenderer: Creating descriptor resources...")
         createDescriptorResources()
         RavenLogger.debug("TextRenderer: Creating text pipeline...")
-        createTextPipeline(renderPass: renderPass)
+        createTextPipeline(renderPass: renderPass, pipelineCache: pipelineCache)
         RavenLogger.debug("TextRenderer: Init complete")
     }
 
@@ -324,7 +324,7 @@ public class TextRenderer {
 
     // MARK: - Text Pipeline
 
-    private func createTextPipeline(renderPass: VkRenderPass) {
+    private func createTextPipeline(renderPass: VkRenderPass, pipelineCache: VkPipelineCache?) {
         RavenLogger.debug("TextPipeline: Creating layout...")
         // Push constant range (viewport size, same as quad pipeline)
         var pushConstantRange = VkPushConstantRange(
@@ -513,7 +513,7 @@ public class TextRenderer {
                     )
 
                     vkCheck(
-                        vkCreateGraphicsPipelines(device, nil, 1, &pipelineInfo, nil, &graphicsPipeline),
+                        vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nil, &graphicsPipeline),
                         "vkCreateGraphicsPipelines(text)"
                     )
                 }
