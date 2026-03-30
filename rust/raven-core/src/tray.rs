@@ -6,15 +6,15 @@ mod sys {
     use std::ffi::c_void;
     use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
     use std::sync::Mutex;
-    use windows_sys::Win32::Foundation::{HWND, LRESULT, WPARAM, LPARAM, POINT};
+    use windows_sys::Win32::Foundation::{HWND, LRESULT, WPARAM, LPARAM};
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows_sys::Win32::UI::Shell::{
-        Shell_NotifyIconW, NOTIFYICONDATAW, NIM_ADD, NIM_DELETE, NIM_MODIFY, NIF_ICON, NIF_MESSAGE,
+        Shell_NotifyIconW, NOTIFYICONDATAW, NIM_ADD, NIM_DELETE, NIF_ICON, NIF_MESSAGE,
         NIF_TIP,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, LoadImageW,
-        PostQuitMessage, RegisterClassW, TranslateMessage, HWND_MESSAGE, IMAGE_ICON,
+        CreateWindowExW, DefWindowProcW, DestroyIcon, DestroyWindow, DispatchMessageW,
+        GetMessageW, LoadImageW, RegisterClassW, TranslateMessage, HWND_MESSAGE, IMAGE_ICON,
         LR_LOADFROMFILE, MSG, WM_USER, WNDCLASSW,
     };
     use std::os::windows::ffi::OsStrExt;
@@ -25,8 +25,6 @@ mod sys {
     static CALLBACK: Mutex<Option<extern "C" fn()>> = Mutex::new(None);
 
     const WM_TRAYICON: u32 = WM_USER + 1;
-    const WM_MOUSEMOVE: u32 = 0x0200;
-    const WM_LBUTTONDOWN: u32 = 0x0201;
     const WM_LBUTTONUP: u32 = 0x0202;
     const WM_RBUTTONUP: u32 = 0x0205;
 
@@ -43,7 +41,6 @@ mod sys {
         lparam: LPARAM,
     ) -> LRESULT {
         if msg == WM_TRAYICON {
-            // Low word of lparam is the mouse event
             let event = (lparam & 0xFFFF) as u32;
             if event == WM_LBUTTONUP || event == WM_RBUTTONUP {
                 if let Ok(guard) = CALLBACK.lock() {
@@ -62,8 +59,9 @@ mod sys {
             return;
         }
         
-        if let Ok(mut guard) = CALLBACK.lock() {
-            *guard = cb;
+        match CALLBACK.lock() {
+            Ok(mut guard) => { *guard = cb; }
+            Err(poisoned) => { *poisoned.into_inner() = cb; }
         }
 
         let title_w = encode_wide(title);
@@ -97,7 +95,7 @@ mod sys {
                     0,
                     0,
                     0,
-                    HWND_MESSAGE, // Message-only window
+                    HWND_MESSAGE,
                     0,
                     hinstance,
                     std::ptr::null(),
@@ -136,8 +134,10 @@ mod sys {
                         DispatchMessageW(&msg);
                     }
 
-                    // On quit, remove icon
                     Shell_NotifyIconW(NIM_DELETE, &nid);
+                    if hicon != 0 {
+                        DestroyIcon(hicon as _);
+                    }
                     DestroyWindow(hwnd);
                 }
             }
@@ -152,7 +152,6 @@ mod sys {
         let hwnd = TRAY_WINDOW.swap(std::ptr::null_mut(), Ordering::SeqCst) as HWND;
         if hwnd != 0 {
             unsafe {
-                // PostQuitMessage equivalent directly via send message or quit
                 use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_QUIT};
                 PostMessageW(hwnd, WM_QUIT, 0, 0);
             }
@@ -171,9 +170,18 @@ pub fn add(title: *const c_char, icon_path: *const c_char, cb: Option<extern "C"
         };
         sys::add(t, p, cb);
     }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (title, icon_path, cb);
+        crate::set_last_error("tray::add not implemented on this platform");
+    }
 }
 
 pub fn remove() {
     #[cfg(target_os = "windows")]
     sys::remove();
+
+    #[cfg(not(target_os = "windows"))]
+    crate::set_last_error("tray::remove not implemented on this platform");
 }

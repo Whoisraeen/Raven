@@ -1,16 +1,16 @@
-# raven-ui-cli
+# swift-raven
 
-CLI for building and developing [Raven](https://github.com/raven-ui/raven) UI framework applications.
+CLI for building and developing [Raven](https://github.com/Whoisraeen/Raven) UI framework applications.
 
 ## Install
 
 ```bash
-npm install -g raven-ui-cli
+npm install -g swift-raven
 ```
 
 ## Prerequisites
 
-- **Swift** 5.9+ (swift.org or Xcode)
+- **Swift** 6.0+ (swift.org or Xcode)
 - **Rust** (rustup.rs)
 - **Vulkan SDK** (lunarg.com/vulkan-sdk)
 - **SDL3** (vendored or system-installed)

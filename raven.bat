@@ -1,11 +1,20 @@
 @echo off
 REM raven.bat — Windows wrapper for the Raven CLI
-REM Delegates to the bash script via Git Bash
+REM Prefers Node.js CLI, falls back to bash script
 
 setlocal
 set "SCRIPT_DIR=%~dp0"
 
-REM Try Git Bash first
+REM Prefer Node.js CLI (works natively on Windows without bash)
+where node >nul 2>&1
+if %errorlevel% equ 0 (
+    if exist "%SCRIPT_DIR%cli\bin\raven.js" (
+        node "%SCRIPT_DIR%cli\bin\raven.js" %*
+        exit /b %errorlevel%
+    )
+)
+
+REM Fallback: try Git Bash
 where bash >nul 2>&1
 if %errorlevel% equ 0 (
     bash "%SCRIPT_DIR%raven" %*
@@ -19,5 +28,5 @@ if %errorlevel% equ 0 (
     exit /b %errorlevel%
 )
 
-echo Error: bash not found. Install Git for Windows or WSL.
+echo Error: Neither Node.js nor bash found. Install Node.js or Git for Windows.
 exit /b 1

@@ -27,14 +27,16 @@ pub extern "C" fn raven_core_init() -> i32 {
     0
 }
 
-/// Returns the last error message, or null if no error.
-/// The returned pointer is valid until the next FFI call.
+/// Returns the last error message as a heap-allocated string, or null if no error.
+/// Caller must free the returned pointer with `raven_core_free_string`.
 #[no_mangle]
-pub extern "C" fn raven_core_last_error() -> *const c_char {
+pub extern "C" fn raven_core_last_error() -> *mut c_char {
     LAST_ERROR.with(|e| {
         match &*e.borrow() {
-            Some(s) if !s.as_bytes().is_empty() => s.as_ptr(),
-            _ => std::ptr::null(),
+            Some(s) if !s.as_bytes().is_empty() => {
+                CString::new(s.as_bytes()).map(|c| c.into_raw()).unwrap_or(std::ptr::null_mut())
+            }
+            _ => std::ptr::null_mut(),
         }
     })
 }
@@ -124,23 +126,23 @@ pub extern "C" fn raven_tray_remove() {
 // MARK: - Window Handling
 
 #[no_mangle]
-pub extern "C" fn raven_window_minimize(hwnd: *mut c_void) {
-    window::minimize(hwnd);
+pub extern "C" fn raven_window_minimize(hwnd: *mut c_void) -> i32 {
+    window::minimize(hwnd)
 }
 
 #[no_mangle]
-pub extern "C" fn raven_window_maximize(hwnd: *mut c_void) {
-    window::maximize(hwnd);
+pub extern "C" fn raven_window_maximize(hwnd: *mut c_void) -> i32 {
+    window::maximize(hwnd)
 }
 
 #[no_mangle]
-pub extern "C" fn raven_window_close(hwnd: *mut c_void) {
-    window::close(hwnd);
+pub extern "C" fn raven_window_close(hwnd: *mut c_void) -> i32 {
+    window::close(hwnd)
 }
 
 #[no_mangle]
-pub extern "C" fn raven_window_set_borderless(hwnd: *mut c_void, borderless: bool) {
-    window::set_borderless(hwnd, borderless);
+pub extern "C" fn raven_window_set_borderless(hwnd: *mut c_void, borderless: i32) -> i32 {
+    window::set_borderless(hwnd, borderless != 0)
 }
 
 // MARK: - Accessibility

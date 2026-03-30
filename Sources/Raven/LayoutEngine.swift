@@ -186,29 +186,36 @@ public enum LayoutEngine {
         let totalSpacing = children.count > 1 ? Float(children.count - 1) * spacing : 0
 
         // Classify children: fixed (fixedHeight), flexible (Spacer), expandable (neither)
+        // In VStacks, only children that themselves contain a Spacer child should expand.
+        // This prevents header/footer rows from growing when only the main content area should.
         var totalFixed: Float = 0
         var flexCount = 0
         var expandableCount = 0
         var totalExpandableIntrinsic: Float = 0
+        var totalNonExpandableIntrinsic: Float = 0
 
         for child in children {
             if child.isFlexible {
                 flexCount += 1
             } else if let fh = child.fixedHeight {
                 totalFixed += fh
-            } else {
+            } else if child.hasFlexibleChild {
+                // This child contains a Spacer — it should expand
                 let ih = child.cachedIntrinsicHeight
                 totalExpandableIntrinsic += ih
                 expandableCount += 1
+            } else {
+                // No Spacer inside — stays at intrinsic height
+                totalNonExpandableIntrinsic += child.cachedIntrinsicHeight
             }
         }
 
-        let usedHeight = totalFixed + totalExpandableIntrinsic + totalSpacing
+        let usedHeight = totalFixed + totalExpandableIntrinsic + totalNonExpandableIntrinsic + totalSpacing
         let remainingHeight = max(0, contentHeight - usedHeight)
 
         let flexibleShare = flexCount > 0 ? remainingHeight / Float(flexCount) : Float(0)
 
-        // When no flexible children, expandable children absorb remaining space
+        // When no flexible children, only expandable children (those with Spacers) absorb remaining space
         let expandableBonus: Float
         if flexCount == 0 && expandableCount > 0 && remainingHeight > 0 {
             expandableBonus = remainingHeight / Float(expandableCount)
@@ -225,8 +232,10 @@ public enum LayoutEngine {
                 childHeight = flexibleShare
             } else if let fh = child.fixedHeight {
                 childHeight = fh
-            } else {
+            } else if child.hasFlexibleChild {
                 childHeight = child.cachedIntrinsicHeight + expandableBonus
+            } else {
+                childHeight = child.cachedIntrinsicHeight
             }
 
             let childWidth = child.fixedWidth ?? contentWidth

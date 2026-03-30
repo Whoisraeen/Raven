@@ -56,8 +56,10 @@ public class AnimationEngine: @unchecked Sendable {
         set { lock.withLock { _currentAnimation = newValue } }
     }
     
-    /// Update all active animations. Called every frame.
+    /// Update all active animations. Called every frame from the main thread.
+    /// Lock protects against concurrent addAnimation calls from background closures.
     public func tick(deltaTime: Double) {
+        lock.lock()
         var remaining: [AnimationInstance] = []
 
         for var animation in activeAnimations {
@@ -70,18 +72,20 @@ public class AnimationEngine: @unchecked Sendable {
         }
 
         activeAnimations = remaining
+        let hasActive = !activeAnimations.isEmpty
+        lock.unlock()
 
-        // Signal that a re-render is needed if any animation updated
-        if !activeAnimations.isEmpty {
+        if hasActive {
             StateTracker.shared.markDirty()
         }
 
-        // Also tick callback-based animations (scroll, etc.)
         tickCallbackAnimations(deltaTime: deltaTime)
     }
     
     func addAnimation(_ instance: AnimationInstance) {
-        activeAnimations.append(instance)
+        lock.withLock {
+            activeAnimations.append(instance)
+        }
     }
 
     // MARK: - Callback-based Animations (used by scroll, etc.)
@@ -92,12 +96,15 @@ public class AnimationEngine: @unchecked Sendable {
     /// non-property animations.
     public func animate(duration: Double = 0.3, from start: Float, to end: Float, update: @escaping (Float) -> Void) {
         let instance = CallbackAnimationInstance(duration: duration, start: start, end: end, update: update)
-        callbackAnimations.append(instance)
+        lock.withLock {
+            callbackAnimations.append(instance)
+        }
     }
 
     /// Tick callback-based animations. Called from the main tick method.
     private func tickCallbackAnimations(deltaTime: Double) {
-        guard !callbackAnimations.isEmpty else { return }
+        lock.lock()
+        guard !callbackAnimations.isEmpty else { lock.unlock(); return }
 
         var i = 0
         while i < callbackAnimations.count {
@@ -117,7 +124,10 @@ public class AnimationEngine: @unchecked Sendable {
             }
         }
 
-        if !callbackAnimations.isEmpty {
+        let hasActive = !callbackAnimations.isEmpty
+        lock.unlock()
+
+        if hasActive {
             StateTracker.shared.markDirty()
         }
     }

@@ -51,9 +51,6 @@ cd Raven
 # Build the Rust platform core
 cd rust/raven-core && cargo build --release && cd ../..
 
-# Compile the GLSL shaders to SPIR-V
-powershell -File Bootstrap/WindowsSDLHello/Shaders/compile_shaders.ps1
-
 # Build the Swift framework and demo
 swift build
 

@@ -81,6 +81,12 @@ public class LayoutNode {
     /// Flexible (expands to fill available space)
     public var isFlexible: Bool = false
 
+    /// Whether this node's immediate children contain a flexible (Spacer) child.
+    /// Used by VStack to decide which children should absorb remaining space.
+    public var hasFlexibleChild: Bool {
+        children.contains { $0.isFlexible }
+    }
+
     /// Flex wrap — when true in a horizontal stack, children wrap to the next line
     public var flexWrap: Bool = false
 

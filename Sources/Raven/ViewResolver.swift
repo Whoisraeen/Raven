@@ -152,6 +152,34 @@ public enum ViewResolver {
             return node
         }
 
+        // ForEach
+        if let forEach = view as? any AnyForEachView {
+            let node = forEach.resolveForEach(path: path)
+            node.id = path
+            return node
+        }
+
+        // List
+        if let list = view as? any AnyListView {
+            let node = list.resolveList(path: path)
+            node.id = path
+            return node
+        }
+
+        // Sidebar
+        if let sidebar = view as? Sidebar {
+            let node = resolveSidebar(sidebar, path: path)
+            node.id = path
+            return node
+        }
+
+        // NavigationStack
+        if let navStack = view as? NavigationStack {
+            let node = resolveNavigationStack(navStack, path: path)
+            node.id = path
+            return node
+        }
+
         // ModifiedView
         if let resolved = resolveModifiedView(view, path: path) {
             return resolved
@@ -716,6 +744,64 @@ public enum ViewResolver {
         }
 
         node.children = [navBar, dividerNode, contentNode]
+        return node
+    }
+
+    // MARK: - Sidebar
+
+    private static func resolveSidebar(_ sidebar: Sidebar, path: String) -> LayoutNode {
+        let theme = Theme.current
+        let node = LayoutNode()
+        node.stackAxis = .horizontal
+        node.id = path
+
+        // Sidebar pane (fixed width)
+        let sidebarNode = LayoutNode()
+        sidebarNode.stackAxis = .vertical
+        sidebarNode.fixedWidth = sidebar.sidebarWidth
+        sidebarNode.backgroundColor = theme.colors.surface
+        sidebarNode.id = "\(path).sb"
+        sidebarNode.children = sidebar.sidebarContent.enumerated().map { index, child in
+            resolveAnyView(child, path: "\(path).s\(index)")
+        }
+
+        // Divider between sidebar and detail
+        let dividerNode = LayoutNode()
+        dividerNode.fixedWidth = 1
+        dividerNode.backgroundColor = theme.colors.divider
+        dividerNode.id = "\(path).sd"
+
+        // Detail pane (flexible)
+        let detailNode = LayoutNode()
+        detailNode.stackAxis = .vertical
+        detailNode.flexGrow = 1
+        detailNode.id = "\(path).dt"
+        detailNode.children = sidebar.detailContent.enumerated().map { index, child in
+            resolveAnyView(child, path: "\(path).d\(index)")
+        }
+
+        node.children = [sidebarNode, dividerNode, detailNode]
+        return node
+    }
+
+    // MARK: - NavigationStack
+
+    private static func resolveNavigationStack(_ navStack: NavigationStack, path: String) -> LayoutNode {
+        let node = LayoutNode()
+        node.stackAxis = .vertical
+        node.id = path
+
+        if let currentRoute = navStack.path.current,
+           let destinationBuilder = navStack.destinations[currentRoute] {
+            let destView = destinationBuilder()
+            let destNode = resolveAnyView(destView, path: "\(path).dest.\(currentRoute)")
+            node.children = [destNode]
+        } else {
+            node.children = navStack.rootContent.enumerated().map { index, child in
+                resolveAnyView(child, path: "\(path).r\(index)")
+            }
+        }
+
         return node
     }
 

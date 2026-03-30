@@ -184,11 +184,13 @@ async function cmdRun(args) {
 
   // Copy SDL3.dll on Windows if needed
   if (os.platform() === "win32") {
-    const dllSrc = path.join(root, "vendor", "SDL3", "SDL3-3.4.2", "lib", "x64", "SDL3.dll");
     const dllDst = path.join(root, ".build", mode, "SDL3.dll");
-    if (fs.existsSync(dllSrc) && !fs.existsSync(dllDst)) {
-      fs.copyFileSync(dllSrc, dllDst);
-      console.log(`  ${c.green("✓")} Copied SDL3.dll`);
+    if (!fs.existsSync(dllDst)) {
+      const sdlDll = findSDL3Dll(root);
+      if (sdlDll) {
+        fs.copyFileSync(sdlDll, dllDst);
+        console.log(`  ${c.green("✓")} Copied SDL3.dll`);
+      }
     }
   }
 
@@ -240,7 +242,7 @@ async function cmdInit(args) {
 
     fs.writeFileSync(
       path.join(projectDir, "Package.swift"),
-      `// swift-tools-version: 5.9
+      `// swift-tools-version: 6.3
 import PackageDescription
 
 let package = Package(
@@ -289,6 +291,11 @@ app.run()
   console.log(`  raven run`);
 }
 
+const TEXT_EXTENSIONS = new Set([
+  ".swift", ".json", ".md", ".txt", ".yml", ".yaml", ".toml", ".cfg", ".ini",
+  ".sh", ".bat", ".ps1", ".js", ".ts", ".html", ".css", ".h", ".c", ".rs",
+]);
+
 function copyDirSync(src, dst, replacements) {
   fs.mkdirSync(dst, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
@@ -297,13 +304,33 @@ function copyDirSync(src, dst, replacements) {
     if (entry.isDirectory()) {
       copyDirSync(srcPath, dstPath, replacements);
     } else {
-      let content = fs.readFileSync(srcPath, "utf-8");
-      for (const [key, value] of Object.entries(replacements)) {
-        content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
+      const ext = path.extname(entry.name).toLowerCase();
+      if (TEXT_EXTENSIONS.has(ext)) {
+        let content = fs.readFileSync(srcPath, "utf-8");
+        for (const [key, value] of Object.entries(replacements)) {
+          content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
+        }
+        fs.writeFileSync(dstPath, content);
+      } else {
+        fs.copyFileSync(srcPath, dstPath);
       }
-      fs.writeFileSync(dstPath, content);
     }
   }
+}
+
+// Find SDL3.dll under vendor/, searching for any version directory.
+function findSDL3Dll(root) {
+  const vendorSDL = path.join(root, "vendor", "SDL3");
+  if (!fs.existsSync(vendorSDL)) return null;
+  try {
+    for (const entry of fs.readdirSync(vendorSDL, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name.startsWith("SDL3-")) {
+        const dll = path.join(vendorSDL, entry.name, "lib", "x64", "SDL3.dll");
+        if (fs.existsSync(dll)) return dll;
+      }
+    }
+  } catch {}
+  return null;
 }
 
 async function cmdBundle(args) {
@@ -381,8 +408,8 @@ function bundleWindows(root, bundleDir, target) {
   console.log(`  ${c.green("✓")} ${target}${ext}`);
 
   // Copy SDL3.dll
-  const sdlDll = path.join(root, "vendor", "SDL3", "SDL3-3.4.2", "lib", "x64", "SDL3.dll");
-  if (fs.existsSync(sdlDll)) {
+  const sdlDll = findSDL3Dll(root);
+  if (sdlDll) {
     fs.copyFileSync(sdlDll, path.join(bundleDir, "SDL3.dll"));
     console.log(`  ${c.green("✓")} SDL3.dll`);
   }
@@ -650,9 +677,9 @@ const commands = {
   version: cmdVersion,
   "--version": cmdVersion,
   "-v": cmdVersion,
-  help: () => { printUsage(); },
-  "--help": () => { printUsage(); },
-  "-h": () => { printUsage(); },
+  help: async () => { printUsage(); },
+  "--help": async () => { printUsage(); },
+  "-h": async () => { printUsage(); },
 };
 
 if (!command || !commands[command]) {

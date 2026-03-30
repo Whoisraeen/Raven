@@ -237,7 +237,11 @@ cmd_clean() {
 }
 
 cmd_version() {
-    echo "raven 0.1.0"
+    local ver="0.1.0"
+    if [ -f "$SCRIPT_DIR/version.json" ]; then
+        ver=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$SCRIPT_DIR/version.json" | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
+    fi
+    echo "raven $ver"
     echo ""
     swift --version 2>/dev/null || echo "Swift: not found"
     echo ""

@@ -7,7 +7,7 @@
 Build beautiful, performant desktop applications with a SwiftUI-inspired declarative API —
 powered by Vulkan, no Electron, no web views.
 
-[![Swift 5.9+](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org)
+[![Swift 6.0+](https://img.shields.io/badge/Swift-6.0+-orange.svg)](https://swift.org)
 [![Vulkan](https://img.shields.io/badge/Vulkan-1.4-red.svg)](https://vulkan.lunarg.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-blue.svg)](.)
 [![License](https://img.shields.io/badge/License-Proprietary-lightgrey.svg)](.)
@@ -90,10 +90,10 @@ app.run()
 | | File dialogs (open/save/folder) | Done |
 | | Swift/Rust FFI bridge | Done |
 | **Tooling** | `raven build` / `raven run` / `raven dev` | Done |
-| | npm CLI (`raven-ui-cli`) | Done |
+| | npm CLI (`swift-raven`) | Done |
 | **Platforms** | Windows | Done |
-| | macOS (MoltenVK) | Planned |
-| | Linux | Planned |
+| | macOS (MoltenVK) | In Progress |
+| | Linux | In Progress |
 
 ---
 
@@ -103,7 +103,7 @@ app.run()
 
 | Dependency | Version | Notes |
 |-----------|---------|-------|
-| [Swift](https://swift.org/download) | 5.9+ | Windows/macOS/Linux |
+| [Swift](https://swift.org/download) | 6.0+ | Windows/macOS/Linux |
 | [Rust](https://rustup.rs) | Latest stable | For platform bridge |
 | [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) | 1.0+ | GPU rendering |
 | [SDL3](https://github.com/libsdl-org/SDL) | 3.4+ | Included in `vendor/` |
@@ -111,7 +111,7 @@ app.run()
 ### Install the CLI
 
 ```bash
-npm install -g raven-ui-cli
+npm install -g swift-raven
 ```
 
 ### Build & Run
@@ -269,4 +269,4 @@ if let path = RavenCore.openFileDialog(title: "Open", filter: "*.swift") {
 
 ## License
 
-Raven is proprietary software. See [LICENSE](LICENSE) for details.
+Raven is proprietary software.

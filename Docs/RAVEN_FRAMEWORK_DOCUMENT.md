@@ -169,17 +169,13 @@ Swift gives developers a modern, expressive, type-safe API that feels familiar t
 
 | Feature | Status | Blocking Issue |
 |---------|--------|----------------|
-| macOS builds | Not started | MoltenVK integration incomplete |
-| Linux builds | Not tested | Package.swift paths need validation |
-| Toggle / Slider / Picker | Missing | No form input components |
-| ProgressView | Missing | No progress indicator |
-| Alert / Menu / TabView | Missing | No system-level UI patterns |
+| macOS builds | In progress | MoltenVK integration incomplete |
+| Linux builds | In progress | Package.swift paths need validation |
+| Alert / Menu | Missing | No system-level UI patterns |
 | Keyboard navigation | Missing | Only TextField has focus, no Tab nav |
-| Hot reload | Missing | raven dev watches files but does full restart |
 | Cross-compilation | Not started | `raven bundle` packages for host platform; cross-compile not yet supported |
 | SVG / vector graphics | Not started | Only raster images supported |
 | VkPipelineCache | Missing | Pipelines recreated from scratch on each launch |
-| Vulkan validation layer integration | Missing | No debug messenger for catching Vulkan misuse |
 
 ---
 
@@ -213,9 +209,7 @@ The following issues from the original audit have been resolved:
 
 2. **Hardcoded component styling** — Button cornerRadius=6, TextField fixedWidth=200, Sheet cornerRadius=12, SidebarItem padding, all baked into ViewResolver rather than configurable via modifiers or theme.
 
-3. **Version scattered across 5 files** — `Cargo.toml`, `cli/package.json`, `raven` script, `raven.js`, and Rust lib all declare "0.1.0" independently. No single source of truth.
-
-4. **Windows-only SDL3/Vulkan paths** — Package.swift hardcodes `vendor/SDL3/SDL3-3.4.2/lib/x64` (no ARM64) and `C:/VulkanSDK/1.4.341.1/` (version-specific). Linux assumes `/usr/lib`.
+3. **Version source of truth** — `version.json` at the repo root is the single source; `Cargo.toml`, `cli/package.json`, `raven` script, and `raven.js` all read from it or should be kept in sync via `sync_version.js`.
 
 #### Medium Priority
 
@@ -427,9 +421,10 @@ Each frame: AnimationEngine.tick(deltaTime:)
 ### Phase 4 — Developer Experience (NEXT)
 **Goal: Good enough that a developer chooses Raven over Tauri for a real project**
 
+- [x] Toggle, Slider, Picker, ProgressView components
+- [x] TabView component
 - [ ] Hot reload with state preservation
-- [ ] Toggle, Slider, Picker, ProgressView components
-- [ ] Alert, Menu, TabView components
+- [ ] Alert, Menu components
 - [ ] Keyboard navigation (Tab, Enter, Space)
 - [ ] Screen reader integration
 - [ ] System tray / menu bar integration
@@ -566,9 +561,9 @@ raven clean
 
 ## 13. Monetization
 
-### Model: Open Source Core + Paid Pro
+### Model: Core + Paid Pro
 
-**Free / Open Source (MIT License)**
+**Core (Proprietary)**
 - Full framework — layout engine, renderer, component library, platform layer
 - CLI tooling
 - Standard component library

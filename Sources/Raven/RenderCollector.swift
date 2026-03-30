@@ -173,7 +173,13 @@ public enum RenderCollector {
             let textWidth = textSize.width
             let textHeight = textSize.height
 
-            let textX = node.x + node.padding.leading
+            // Center text in fixed-frame nodes (icons, badges); left-align otherwise
+            let textX: Float
+            if node.fixedWidth != nil && textWidth < availWidth {
+                textX = node.x + node.padding.leading + (availWidth - textWidth) / 2
+            } else {
+                textX = node.x + node.padding.leading
+            }
             let textY = node.y + node.padding.top + max(0, (node.height - node.padding.top - node.padding.bottom - textHeight) / 2)
 
             output.textCommands.append(TextDrawCommand(

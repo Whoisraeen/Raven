@@ -4,6 +4,9 @@ import CRavenCore
 
 /// High-level Swift wrapper for cross-platform OS services.
 /// These APIs work identically on Windows, macOS, and Linux via Rust FFI.
+///
+/// This is the recommended public API for platform services. `RavenCore` provides
+/// the same functionality as internal/low-level access. Prefer `RavenPlatform` in app code.
 public enum RavenPlatform {
 
     // MARK: - Clipboard

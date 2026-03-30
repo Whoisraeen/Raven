@@ -29,8 +29,9 @@ static TREE_JSON: Mutex<Option<String>> = Mutex::new(None);
 /// Returns 0 on success, -1 on error.
 pub fn set_tree(json: *const c_char) -> i32 {
     if json.is_null() {
-        if let Ok(mut tree) = TREE_JSON.lock() {
-            *tree = None;
+        match TREE_JSON.lock() {
+            Ok(mut tree) => { *tree = None; }
+            Err(poisoned) => { *poisoned.into_inner() = None; }
         }
         return 0;
     }
@@ -44,13 +45,14 @@ pub fn set_tree(json: *const c_char) -> i32 {
         }
     };
 
-    // Store the tree
-    if let Ok(mut tree) = TREE_JSON.lock() {
-        *tree = Some(json_str.clone());
-    }
-
-    // Push to platform-specific accessibility API
+    // Push to platform-specific accessibility API first (borrows json_str)
     push_to_platform(&json_str);
+
+    // Then move owned string into the mutex (no clone needed)
+    match TREE_JSON.lock() {
+        Ok(mut tree) => { *tree = Some(json_str); }
+        Err(poisoned) => { *poisoned.into_inner() = Some(json_str); }
+    }
 
     0
 }
@@ -58,7 +60,10 @@ pub fn set_tree(json: *const c_char) -> i32 {
 /// Get the current accessibility tree as JSON.
 /// Caller must free the returned string with `raven_core_free_string`.
 pub fn get_tree() -> *mut c_char {
-    let tree = TREE_JSON.lock().ok().and_then(|t| t.clone());
+    let tree = match TREE_JSON.lock() {
+        Ok(t) => t.clone(),
+        Err(poisoned) => poisoned.into_inner().clone(),
+    };
     match tree {
         Some(json) => CString::new(json).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut()),
         None => std::ptr::null_mut(),

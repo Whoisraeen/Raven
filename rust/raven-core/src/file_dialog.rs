@@ -140,10 +140,16 @@ fn show_folder_dialog(title: &str) -> Option<String> {
 
 // --- macOS implementations using osascript ---
 
+/// Escape a string for use inside AppleScript double-quoted literals.
+/// Backslashes must be escaped first, then double-quotes.
+#[cfg(target_os = "macos")]
+fn escape_applescript_dq(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 #[cfg(target_os = "macos")]
 fn show_open_dialog(title: &str, filter: Option<&str>) -> Option<String> {
     use std::process::Command;
-    // Filter format: "txt,png,jpg" — converted to AppleScript type list
     let type_part = match filter {
         Some(f) if !f.is_empty() => {
             let types: Vec<String> = f.split(',')
@@ -155,7 +161,7 @@ fn show_open_dialog(title: &str, filter: Option<&str>) -> Option<String> {
     };
     let script = format!(
         r#"choose file with prompt "{}"{}"#,
-        title.replace('"', "\\\""),
+        escape_applescript_dq(title),
         type_part
     );
     Command::new("osascript")
@@ -164,7 +170,6 @@ fn show_open_dialog(title: &str, filter: Option<&str>) -> Option<String> {
         .ok()
         .and_then(|out| String::from_utf8(out.stdout).ok())
         .map(|s| {
-            // osascript returns "alias Macintosh HD:Users:..." — convert to POSIX
             let trimmed = s.trim();
             if trimmed.starts_with("alias ") {
                 trimmed
@@ -183,12 +188,12 @@ fn show_open_dialog(title: &str, filter: Option<&str>) -> Option<String> {
 fn show_save_dialog(title: &str, default_name: Option<&str>) -> Option<String> {
     use std::process::Command;
     let default_part = match default_name {
-        Some(name) => format!(r#" default name "{}""#, name.replace('"', "\\\"")),
+        Some(name) => format!(r#" default name "{}""#, escape_applescript_dq(name)),
         None => String::new(),
     };
     let script = format!(
         r#"choose file name with prompt "{}"{}"#,
-        title.replace('"', "\\\""),
+        escape_applescript_dq(title),
         default_part
     );
     Command::new("osascript")
@@ -205,7 +210,7 @@ fn show_folder_dialog(title: &str) -> Option<String> {
     use std::process::Command;
     let script = format!(
         r#"choose folder with prompt "{}""#,
-        title.replace('"', "\\\"")
+        escape_applescript_dq(title)
     );
     Command::new("osascript")
         .args(["-e", &script])

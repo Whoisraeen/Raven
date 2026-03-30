@@ -18,9 +18,9 @@ Cross-platform OS service bindings that work identically on Windows, macOS, and 
          │ Rust extern "C"
          ▼
 ┌──────────────────────┐
-│  raven-core (Rust)   │  platform_api.rs
+│  raven-core (Rust)   │  clipboard.rs
 │  ┌─────────────────┐ │
-│  │ Win: PowerShell  │ │
+│  │ Win: Win32 API   │ │
 │  │ Mac: pbcopy      │ │
 │  │ Lin: xclip       │ │
 │  └─────────────────┘ │
@@ -46,7 +46,7 @@ RavenPlatform.clipboardSetText("Hello from Raven!")
 ### Platform Backends
 | Platform | Read | Write |
 |----------|------|-------|
-| Windows | `Get-Clipboard` (PowerShell) | `Set-Clipboard` (PowerShell) |
+| Windows | Win32 `GetClipboardData` (native API) | Win32 `SetClipboardData` (native API) |
 | macOS | `pbpaste` | `pbcopy` |
 | Linux | `xclip -selection clipboard -o` | `xclip -selection clipboard` |
 
@@ -147,7 +147,7 @@ fn my_api_impl() -> i32 { /* Linux code */ }
 
 | Platform | Dependencies |
 |----------|-------------|
-| Windows | PowerShell 5.1+ (built-in) |
+| Windows | PowerShell 5.1+ (for notifications/file dialogs); Win32 API (for clipboard) |
 | macOS | `osascript` + `pbcopy`/`pbpaste` (built-in) |
 | Linux | `xclip`, `zenity`, `notify-send` (install via package manager) |
 

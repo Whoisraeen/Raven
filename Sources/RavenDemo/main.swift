@@ -26,7 +26,7 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height:
             // Discord Home Icon
             Text("D")
                 .foreground(.white)
-                .padding(16)
+                .frame(width: 48, height: 48)
                 .background(blurple)
                 .cornerRadius(24)
                 .onTapGesture {
@@ -38,7 +38,7 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height:
             // Server 1
             Text("RA")
                 .foreground(.white)
-                .padding(16)
+                .frame(width: 48, height: 48)
                 .background(selectedServer.value == 1 ? blurple : Color(0.19, 0.20, 0.22))
                 .cornerRadius(selectedServer.value == 1 ? 16 : 24)
                 .onTapGesture {
@@ -48,7 +48,7 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height:
             // Server 2
             Text("SW")
                 .foreground(.white)
-                .padding(16)
+                .frame(width: 48, height: 48)
                 .background(selectedServer.value == 2 ? blurple : Color(0.19, 0.20, 0.22))
                 .cornerRadius(selectedServer.value == 2 ? 16 : 24)
                 .onTapGesture {
@@ -56,9 +56,9 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height:
                 }
 
             // Add Server
-            Text("++")
+            Text("+")
                 .foreground(.green)
-                .padding(16)
+                .frame(width: 48, height: 48)
                 .background(Color(0.19, 0.20, 0.22))
                 .cornerRadius(24)
 
@@ -85,6 +85,7 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height:
                 // Category
                 HStack {
                     Text("TEXT CHANNELS")
+                        .font(size: 12)
                         .foreground(textMuted)
                     Spacer()
                 }
@@ -137,14 +138,16 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height:
             HStack(spacing: 8) {
                 Text("U")
                     .foreground(.white)
-                    .padding(8)
+                    .frame(width: 32, height: 32)
                     .background(blurple)
                     .cornerRadius(16)
 
                 VStack(spacing: 2) {
                     Text("Developer")
+                        .font(size: 13)
                         .foreground(.white)
                     Text("#1234")
+                        .font(size: 11)
                         .foreground(textMuted)
                 }
                 Spacer()
@@ -177,19 +180,23 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height:
                 // Message 1
                 HStack(spacing: 16) {
                     Text("R")
+                        .font(size: 15)
                         .foreground(.white)
-                        .padding(12)
+                        .frame(width: 40, height: 40)
                         .background(Color.red)
                         .cornerRadius(20)
 
                     VStack(spacing: 4) {
                         HStack(spacing: 8) {
                             Text("Raeen")
+                                .font(size: 15)
                                 .foreground(.white)
                             Text("Today at 10:00 AM")
+                                .font(size: 12)
                                 .foreground(textMuted)
                         }
                         Text("Welcome to the new Raven UI Framework! It's super fast.")
+                            .font(size: 14)
                             .foreground(textNormal)
                     }
                     Spacer()
@@ -198,19 +205,23 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height:
                 // Message 2
                 HStack(spacing: 16) {
                     Text("R")
+                        .font(size: 15)
                         .foreground(.white)
-                        .padding(12)
+                        .frame(width: 40, height: 40)
                         .background(blurple)
                         .cornerRadius(20)
 
                     VStack(spacing: 4) {
                         HStack(spacing: 8) {
                             Text("Raven Bot")
+                                .font(size: 15)
                                 .foreground(.white)
                             Text("Today at 10:05 AM")
+                                .font(size: 12)
                                 .foreground(textMuted)
                         }
                         Text("The Vulkan backend is running smoothly.")
+                            .font(size: 14)
                             .foreground(textNormal)
 
                         // Embedded UI Component Demo
@@ -245,52 +256,65 @@ let app = RavenApp(title: "Discord - Raven Framework Demo", width: 1060, height:
         .background(chatBg)
 
         // --- 4. Member List (Far Right, 240px) ---
-        VStack(spacing: 16) {
-            Text("ONLINE - 2")
+        VStack(spacing: 4) {
+            Text("ONLINE — 2")
+                .font(size: 11)
                 .foreground(textMuted)
+                .padding(top: 4, leading: 0, bottom: 4, trailing: 0)
 
             // Member 1
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Text("R")
+                    .font(size: 13)
                     .foreground(.white)
-                    .padding(8)
+                    .frame(width: 32, height: 32)
                     .background(Color.red)
                     .cornerRadius(16)
                 Text("Raeen")
+                    .font(size: 14)
                     .foreground(textNormal)
                 Spacer()
             }
+            .padding(4)
 
             // Member 2
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Text("R")
+                    .font(size: 13)
                     .foreground(.white)
-                    .padding(8)
+                    .frame(width: 32, height: 32)
                     .background(blurple)
                     .cornerRadius(16)
                 Text("Raven Bot")
+                    .font(size: 14)
                     .foreground(blurple)
                 Spacer()
             }
+            .padding(4)
 
-            Text("OFFLINE - 1")
+            Text("OFFLINE — 1")
+                .font(size: 11)
                 .foreground(textMuted)
+                .padding(top: 12, leading: 0, bottom: 4, trailing: 0)
 
             // Member 3
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Text("G")
+                    .font(size: 13)
                     .foreground(.white)
-                    .padding(8)
+                    .frame(width: 32, height: 32)
                     .background(textMuted)
                     .cornerRadius(16)
                 Text("Guest")
+                    .font(size: 14)
                     .foreground(textMuted)
                 Spacer()
             }
+            .padding(4)
 
             Spacer()
         }
-        .padding(16)
+        .padding(12)
         .frame(width: 240)
         .background(memberBg)
     }

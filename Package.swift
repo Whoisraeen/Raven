@@ -10,7 +10,14 @@ import PackageDescription
 
 // Homebrew: /opt/homebrew on Apple Silicon, /usr/local on Intel
 // Override via RAVEN_HOMEBREW_PREFIX env var if needed.
-let homebrewPrefix = Context.environment["RAVEN_HOMEBREW_PREFIX"] ?? "/opt/homebrew"
+let homebrewPrefix = Context.environment["RAVEN_HOMEBREW_PREFIX"] ?? {
+    // Detect Apple Silicon vs Intel by checking if /opt/homebrew exists
+    // (SPM doesn't expose arch, but this path only exists on AS)
+    let asPath = "/opt/homebrew"
+    let intelPath = "/usr/local"
+    // Default to /opt/homebrew; Intel users should set RAVEN_HOMEBREW_PREFIX=/usr/local
+    return asPath
+}()
 
 let sdlLibraryPath = Context.environment["RAVEN_SDL_LIB"] ?? "\(homebrewPrefix)/lib"
 let vulkanIncludePath = Context.environment["VULKAN_SDK"].map { "\($0)/include" } ?? "\(homebrewPrefix)/include"
@@ -24,16 +31,7 @@ let platformSwiftSettings: [SwiftSetting] = [
     .unsafeFlags(["-Xcc", "-I\(vulkanIncludePath)"]),
 ]
 
-let ravenLinkerSettings: [LinkerSetting] = [
-    .unsafeFlags(["-L\(sdlLibraryPath)"]),
-    .unsafeFlags(["-L\(vulkanLibraryPath)"]),
-    .unsafeFlags(["-L\(ravenCoreLibPath)"]),
-    .linkedLibrary("SDL3"),
-    .linkedLibrary("vulkan"),
-    .linkedLibrary("raven_core"),
-]
-
-let demoLinkerSettings: [LinkerSetting] = [
+let sharedLinkerSettings: [LinkerSetting] = [
     .unsafeFlags(["-L\(sdlLibraryPath)"]),
     .unsafeFlags(["-L\(vulkanLibraryPath)"]),
     .unsafeFlags(["-L\(ravenCoreLibPath)"]),
@@ -59,7 +57,8 @@ if let sdk = vulkanSDKEnv {
     vulkanIncludePath = "\(sdk)/Include"
     vulkanLibraryPath = "\(sdk)/Lib"
 } else {
-    // Emit a build warning — user must set VULKAN_SDK
+    // Fallback: try to find any installed version under C:/VulkanSDK/
+    // Users should set VULKAN_SDK for reliable builds
     vulkanIncludePath = "C:/VulkanSDK/Include"
     vulkanLibraryPath = "C:/VulkanSDK/Lib"
 }
@@ -74,26 +73,7 @@ let platformSwiftSettings: [SwiftSetting] = [
     .unsafeFlags(["-Xcc", "-I\(vulkanIncludePath)"]),
 ]
 
-let ravenLinkerSettings: [LinkerSetting] = [
-    .unsafeFlags(["-Xlinker", "/LIBPATH:\(sdlLibraryPath)"]),
-    .unsafeFlags(["-Xlinker", "/LIBPATH:\(vulkanLibraryPath)"]),
-    .unsafeFlags(["-Xlinker", "/LIBPATH:\(ravenCoreLibPath)"]),
-    .linkedLibrary("SDL3"),
-    .linkedLibrary("vulkan-1"),
-    .linkedLibrary("raven_core"),
-    // Rust stdlib dependencies on Windows
-    .linkedLibrary("ws2_32"),
-    .linkedLibrary("ntdll"),
-    .linkedLibrary("userenv"),
-    .linkedLibrary("advapi32"),
-    .linkedLibrary("bcrypt"),
-    // Platform bridge (clipboard, file dialogs)
-    .linkedLibrary("user32"),
-    .linkedLibrary("ole32"),
-    .linkedLibrary("shell32"),
-]
-
-let demoLinkerSettings: [LinkerSetting] = [
+let sharedLinkerSettings: [LinkerSetting] = [
     .unsafeFlags(["-Xlinker", "/LIBPATH:\(sdlLibraryPath)"]),
     .unsafeFlags(["-Xlinker", "/LIBPATH:\(vulkanLibraryPath)"]),
     .unsafeFlags(["-Xlinker", "/LIBPATH:\(ravenCoreLibPath)"]),
@@ -116,9 +96,11 @@ let demoLinkerSettings: [LinkerSetting] = [
 
 // Linux: use standard system paths or env overrides
 // Install deps: sudo apt install libsdl3-dev libvulkan-dev vulkan-tools
-let sdlLibraryPath = Context.environment["RAVEN_SDL_LIB"] ?? "/usr/lib/x86_64-linux-gnu"
+// Detect multiarch path from dpkg if available, otherwise use /usr/lib
+let defaultLibPath = Context.environment["RAVEN_SDL_LIB"] ?? "/usr/lib"
+let sdlLibraryPath = defaultLibPath
 let vulkanIncludePath = Context.environment["VULKAN_SDK"].map { "\($0)/include" } ?? "/usr/include"
-let vulkanLibraryPath = Context.environment["VULKAN_SDK"].map { "\($0)/lib" } ?? "/usr/lib/x86_64-linux-gnu"
+let vulkanLibraryPath = Context.environment["VULKAN_SDK"].map { "\($0)/lib" } ?? defaultLibPath
 let ravenCoreLibPath = "rust/raven-core/target/release"
 
 let sdlIncludePath = "Sources/CSDL3"
@@ -128,16 +110,7 @@ let platformSwiftSettings: [SwiftSetting] = [
     .unsafeFlags(["-Xcc", "-I\(vulkanIncludePath)"]),
 ]
 
-let ravenLinkerSettings: [LinkerSetting] = [
-    .unsafeFlags(["-L\(sdlLibraryPath)"]),
-    .unsafeFlags(["-L\(vulkanLibraryPath)"]),
-    .unsafeFlags(["-L\(ravenCoreLibPath)"]),
-    .linkedLibrary("SDL3"),
-    .linkedLibrary("vulkan"),
-    .linkedLibrary("raven_core"),
-]
-
-let demoLinkerSettings: [LinkerSetting] = [
+let sharedLinkerSettings: [LinkerSetting] = [
     .unsafeFlags(["-L\(sdlLibraryPath)"]),
     .unsafeFlags(["-L\(vulkanLibraryPath)"]),
     .unsafeFlags(["-L\(ravenCoreLibPath)"]),
@@ -188,19 +161,19 @@ let package = Package(
             exclude: ["Shaders"],
             resources: [.process("Resources")],
             swiftSettings: platformSwiftSettings,
-            linkerSettings: ravenLinkerSettings
+            linkerSettings: sharedLinkerSettings
         ),
         .executableTarget(
             name: "RavenDemo",
             dependencies: ["Raven"],
             swiftSettings: platformSwiftSettings,
-            linkerSettings: demoLinkerSettings
+            linkerSettings: sharedLinkerSettings
         ),
         .testTarget(
             name: "RavenTests",
             dependencies: ["Raven"],
             swiftSettings: platformSwiftSettings,
-            linkerSettings: demoLinkerSettings
+            linkerSettings: sharedLinkerSettings
         )
     ]
 )

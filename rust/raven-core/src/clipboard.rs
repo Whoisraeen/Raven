@@ -56,7 +56,8 @@ fn get_clipboard_text() -> Option<String> {
         // data is a *const u16 (UTF-16 null-terminated)
         let wide = data as *const u16;
         let mut len = 0usize;
-        while *wide.add(len) != 0 {
+        const MAX_CLIPBOARD_LEN: usize = 16 * 1024 * 1024; // 16M chars safety limit
+        while len < MAX_CLIPBOARD_LEN && *wide.add(len) != 0 {
             len += 1;
         }
 

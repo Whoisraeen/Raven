@@ -27,9 +27,12 @@ enum RavenCore {
     }
 
     /// Returns the last error message from a Rust FFI call, or nil if no error.
+    /// Caller-owned: the returned string is heap-allocated and freed here.
     static var lastError: String? {
         guard let ptr = raven_core_last_error() else { return nil }
-        return String(cString: ptr)
+        let str = String(cString: ptr)
+        raven_core_free_string(ptr)
+        return str
     }
 
     // MARK: - Clipboard
@@ -142,21 +145,25 @@ enum RavenCore {
         return str
     }
 
-    // MARK: - Window Management (Native Hacks)
+    // MARK: - Window Management
 
-    static func windowMinimize(hwnd: UnsafeMutableRawPointer) {
-        raven_window_minimize(hwnd)
+    @discardableResult
+    static func windowMinimize(hwnd: UnsafeMutableRawPointer) -> Bool {
+        raven_window_minimize(hwnd) == 0
     }
 
-    static func windowMaximize(hwnd: UnsafeMutableRawPointer) {
-        raven_window_maximize(hwnd)
+    @discardableResult
+    static func windowMaximize(hwnd: UnsafeMutableRawPointer) -> Bool {
+        raven_window_maximize(hwnd) == 0
     }
 
-    static func windowClose(hwnd: UnsafeMutableRawPointer) {
-        raven_window_close(hwnd)
+    @discardableResult
+    static func windowClose(hwnd: UnsafeMutableRawPointer) -> Bool {
+        raven_window_close(hwnd) == 0
     }
 
-    static func windowSetBorderless(hwnd: UnsafeMutableRawPointer, borderless: Bool) {
-        raven_window_set_borderless(hwnd, borderless)
+    @discardableResult
+    static func windowSetBorderless(hwnd: UnsafeMutableRawPointer, borderless: Bool) -> Bool {
+        raven_window_set_borderless(hwnd, borderless ? 1 : 0) == 0
     }
 }

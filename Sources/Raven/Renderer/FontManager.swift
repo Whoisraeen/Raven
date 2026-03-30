@@ -136,7 +136,11 @@ public class FontManager: @unchecked Sendable {
 
     /// Get glyph info for a character at a given pixel size.
     /// Generates the SDF glyph and packs into atlas on first request.
+    /// Thread-safe: glyph cache and atlas access are protected by lock.
     public func getGlyph(codepoint: UInt32, fontSize: Float) -> GlyphInfo? {
+        lock.lock()
+        defer { lock.unlock() }
+
         let key = GlyphKey(codepoint: codepoint, fontSize: fontSize)
         if let cached = glyphCache[key] {
             return cached

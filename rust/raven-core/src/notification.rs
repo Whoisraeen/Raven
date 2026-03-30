@@ -20,12 +20,22 @@ pub fn show(title: *const c_char, body: *const c_char) -> bool {
     notification_show_impl(title_str, body_str)
 }
 
+/// Escape a string for use inside PowerShell single-quoted literals.
+/// Single-quoted strings in PowerShell are fully literal (no variable expansion),
+/// so the only character that needs escaping is `'` itself (doubled to `''`).
+#[cfg(target_os = "windows")]
+fn escape_powershell_sq(s: &str) -> String {
+    s.replace('\'', "''")
+}
+
 #[cfg(target_os = "windows")]
 fn notification_show_impl(title: &str, body: &str) -> bool {
     use std::process::Command;
+    let safe_title = escape_powershell_sq(title);
+    let safe_body = escape_powershell_sq(body);
     let script = format!(
         r#"[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime] | Out-Null; $t = [Windows.UI.Notifications.ToastTemplateType]::ToastText02; $x = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent($t); $nodes = $x.GetElementsByTagName('text'); $nodes.Item(0).AppendChild($x.CreateTextNode('{}')); $nodes.Item(1).AppendChild($x.CreateTextNode('{}')); $n = [Windows.UI.Notifications.ToastNotification]::new($x); [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Raven').Show($n)"#,
-        title.replace('\'', ""), body.replace('\'', "")
+        safe_title, safe_body
     );
     Command::new("powershell")
         .args(["-NoProfile", "-Command", &script])
@@ -34,13 +44,20 @@ fn notification_show_impl(title: &str, body: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Escape a string for use inside AppleScript double-quoted literals.
+/// Backslashes must be escaped first, then double-quotes.
+#[cfg(target_os = "macos")]
+fn escape_applescript_dq(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
 #[cfg(target_os = "macos")]
 fn notification_show_impl(title: &str, body: &str) -> bool {
     use std::process::Command;
     let script = format!(
         r#"display notification "{}" with title "{}""#,
-        body.replace('"', "\\\""),
-        title.replace('"', "\\\"")
+        escape_applescript_dq(body),
+        escape_applescript_dq(title)
     );
     Command::new("osascript")
         .args(["-e", &script])

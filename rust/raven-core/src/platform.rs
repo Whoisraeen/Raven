@@ -2,19 +2,16 @@ use std::ffi::{c_char, CString};
 
 pub fn platform_name() -> *const c_char {
     #[cfg(target_os = "windows")]
-    {
-        c"windows".as_ptr()
-    }
+    { c"windows".as_ptr() }
 
     #[cfg(target_os = "macos")]
-    {
-        c"macos".as_ptr()
-    }
+    { c"macos".as_ptr() }
 
     #[cfg(target_os = "linux")]
-    {
-        c"linux".as_ptr()
-    }
+    { c"linux".as_ptr() }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    { c"unknown".as_ptr() }
 }
 
 pub fn os_version() -> *mut c_char {
@@ -59,4 +56,9 @@ fn get_os_version() -> String {
                 .map(|line| line.trim_start_matches("PRETTY_NAME=").trim_matches('"').to_string())
         })
         .unwrap_or_else(|| "Linux (unknown distribution)".to_string())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+fn get_os_version() -> String {
+    "Unknown OS".to_string()
 }

@@ -636,25 +636,48 @@ Result builder that enables the declarative `{ }` block syntax. Supports:
 
 ---
 
-## Platform (RavenCore)
+## Platform (RavenPlatform)
 
-Swift wrapper around the Rust FFI layer.
+Recommended public API for cross-platform OS services. Prefer `RavenPlatform` in app code; `RavenCore` provides equivalent low-level access for internal use.
 
 ```swift
-enum RavenCore {
-    static func initialize()                           // Init the Rust runtime
-    static var version: String                         // "0.1.0"
-    static var platformName: String                    // "windows" / "macos" / "linux"
-    static var osVersion: String                       // e.g. "10.0.26200"
-    static var lastError: String?                      // Last FFI error, or nil
-
+public enum RavenPlatform {
     // Clipboard
-    static func clipboardGet() -> String?
-    static func clipboardSet(_ text: String) -> Bool
+    static func clipboardGetText() -> String?
+    static func clipboardSetText(_ text: String) -> Bool
 
     // File Dialogs
     static func openFileDialog(title:filter:) -> String?
     static func saveFileDialog(title:defaultName:) -> String?
+
+    // Notifications
+    static func showNotification(title:body:) -> Bool
+}
+```
+
+### Low-Level (RavenCore)
+
+Internal FFI wrapper — includes additional APIs for window management, tray, and accessibility.
+
+```swift
+enum RavenCore {
+    static func initialize()
+    static var version: String
+    static var platformName: String
+    static var osVersion: String
+    static var lastError: String?
+
+    static func clipboardGet() -> String?
+    static func clipboardSet(_ text: String) -> Bool
+    static func openFileDialog(title:filter:) -> String?
+    static func saveFileDialog(title:defaultName:) -> String?
     static func selectFolderDialog(title:) -> String?
+    static func showNotification(title:body:) -> Bool
+
+    // Window management (returns true on success)
+    static func windowMinimize(hwnd:) -> Bool
+    static func windowMaximize(hwnd:) -> Bool
+    static func windowClose(hwnd:) -> Bool
+    static func windowSetBorderless(hwnd:borderless:) -> Bool
 }
 ```
