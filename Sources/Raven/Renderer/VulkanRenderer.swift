@@ -655,10 +655,6 @@ final class VulkanRenderer: @unchecked Sendable {
             fail("vkCreateSwapchainKHR(recreate) returned null")
         }
 
-        if let old = oldSwapchain {
-            vkDestroySwapchainKHR(device, old, nil)
-        }
-
         var swapchainImageCount: UInt32 = 0
         vkCheck(
             vkGetSwapchainImagesKHR(device, newSwapchain, &swapchainImageCount, nil),
@@ -669,6 +665,10 @@ final class VulkanRenderer: @unchecked Sendable {
             vkGetSwapchainImagesKHR(
                 device, newSwapchain, &swapchainImageCount, buffer.baseAddress)
         }
+
+        // Destroy the old swapchain AFTER successfully creating the new one.
+        // The Vulkan spec mandates this even when oldSwapchain was passed to vkCreateSwapchainKHR.
+        vkDestroySwapchainKHR(device, oldSwapchain, nil)
 
         swapchain = newSwapchain
         self.swapchainExtent = swapchainExtent

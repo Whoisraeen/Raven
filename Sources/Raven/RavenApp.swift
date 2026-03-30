@@ -412,12 +412,6 @@ public class RavenApp<Content: View>: @unchecked Sendable {
                     viewportHeight: renderer.swapchainExtent.height,
                     dirtyRect: currentRenderDirtyRect
                 )
-                    textCommands: cachedTextCommands,
-                    imageCommands: cachedImageCommands,
-                    viewportWidth: renderer.swapchainExtent.width,
-                    viewportHeight: renderer.swapchainExtent.height,
-                    dirtyRect: currentRenderDirtyRect
-                )
                 
                 // Only submit if the render thread isn't still busy with a previous frame
                 // This acts as a simple backpressure mechanism (double-buffering)
