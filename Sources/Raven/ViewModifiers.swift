@@ -298,4 +298,11 @@ extension View {
     public func accessibilityRole(_ role: AccessibilityRole) -> ModifiedView<Self, AccessibilityRoleModifier> {
         ModifiedView(content: self, modifier: AccessibilityRoleModifier(role: role))
     }
+
+    // MARK: - Theme Extension
+
+    /// Apply a theme to this view and its descendants.
+    public func theme(_ theme: Theme) -> ModifiedView<Self, EnvironmentModifier<Theme>> {
+        self.environment(\.theme, theme)
+    }
 }
